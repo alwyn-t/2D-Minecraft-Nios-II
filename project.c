@@ -44,6 +44,33 @@ short int dirt_block_texture[64] = {
     0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2,
     0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2,
     0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2};
+short int pig_entity_texture[64] = {
+    0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x0000, 0x0000, 0xFD54, 0xFCD3, 0xFD54, 0xFD54,
+    0x0000, 0x0000, 0x0000, 0x0000, 0x9289, 0xFD54, 0x72AA, 0xFD54,
+    0xFC51, 0xFCB2, 0xFC51, 0xFCB2, 0x9289, 0xFD54, 0xFCD3, 0xFD54,
+    0xFCB2, 0xE34C, 0xE34C, 0xE34C, 0xFC51, 0xFC51, 0xFD54, 0xFCD3,
+    0xFCB2, 0xFC51, 0xE34C, 0xFCB2, 0xE34C, 0xFCB2, 0x0000, 0x0000,
+    0xE34C, 0xF38E, 0x0000, 0x0000, 0xF38E, 0xE34C, 0x0000, 0x0000,
+    0xE34C, 0x5945, 0x0000, 0x0000, 0xE34C, 0x5945, 0x0000, 0x0000};
+short int player_top_entity_texture[64] = {
+    0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x28E1, 0x20C1, 0x20C1, 0x3942, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x20C1, 0x7A88, 0x7A88, 0x7AC8, 0x0000, 0x0000,
+    0x0000, 0x0000, 0xBDF7, 0x316C, 0xBDF7, 0x316C, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x7AC8, 0x7AC8, 0x7AC8, 0x7AC8, 0x0000, 0x0000,
+    0x2BAF, 0x33F0, 0x230C, 0x7A88, 0x7A88, 0x33F0, 0x230C, 0x2BAF,
+    0x230C, 0x2BAF, 0x2BAF, 0x33F0, 0x230C, 0x2BAF, 0x2BAF, 0x230C,
+    0x61E5, 0x6A26, 0x33F0, 0x2BAF, 0x230C, 0x33F0, 0x6A26, 0x61E5};
+short int player_bottom_entity_texture[64] = {
+    0x7287, 0x6A26, 0x33F0, 0x230C, 0x2BAF, 0x33F0, 0x7287, 0x6A26,
+    0x6A26, 0x7287, 0x2BAF, 0x33F0, 0x230C, 0x2BAF, 0x6A26, 0x6A26,
+    0x7287, 0x6A26, 0x294D, 0x296E, 0x294D, 0x0000, 0x6A26, 0x7287,
+    0x0000, 0x0000, 0x296E, 0x296E, 0x296E, 0x294D, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x212C, 0x212C, 0x294D, 0x212C, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x294D, 0x294D, 0x296E, 0x294D, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x296E, 0x296E, 0x294D, 0x296E, 0x0000, 0x0000,
+    0x0000, 0x0000, 0x2965, 0x31A6, 0x2965, 0x31A6, 0x0000, 0x0000};
 
 // game definitions
 enum BlockType {
@@ -63,13 +90,17 @@ struct Block {
   int animation_frame_state;
 };
 struct Block testBlock = {stone, false, 0};
-enum EntityType { player, chicken, pig, cow };
+enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow };
 struct Entity {
   int x;
   int y;
   enum EntityType entity_type;
   int animation_frame_state;
 };
+struct Entity global_player;
+#define mob_cap 100
+struct Entity global_passive_mobs[mob_cap];
+struct Entity global_hostile_mobs[mob_cap];
 // centre of the camera position
 struct camera {
   int x;
@@ -96,11 +127,12 @@ void save_map();
 // game rendering
 void draw_block(struct Block *, int x_8, int y_8);
 void draw_blocks();
-void draw_entity();
+void draw_entity(struct Entity *entity);
 void draw_entities();
 void draw_block_overlay(struct Block *, int x_8, int y_8);
 void draw_block_overlays();
 void draw_map();
+void draw_8x8_transparent(short int *, int x, int y);
 
 // keyboard input
 struct controller_inputs {
@@ -120,6 +152,10 @@ struct controller_inputs {
 struct controller_inputs global_controller_inputs = {
     false, false, false, false, false, false, false, false, false};
 void PS2_poll();
+
+// game logic
+void update_blocks();
+void update_entities();
 
 // general rendering
 void clear_screen();
@@ -152,10 +188,12 @@ int main(void) {
     printf("draw\n");
     // draw_block(&testBlock, 20, 1);
     PS2_poll();
+    update_entities();
     printf("a: %d d: %d pause toggle:%d\n", global_controller_inputs.left,
            global_controller_inputs.right,
            global_controller_inputs.pause_toggle);
     draw_blocks();
+    draw_entities();
 
     wait_for_vsync_and_swap();
   }
@@ -192,6 +230,15 @@ void generate_map() {
       }
     }
   }
+  struct Entity temp_player = {10 * 8, 32 * 8, player, 0};
+  global_player = temp_player;
+  struct Entity temp_blank_entity = {0, 0, unassigned_entity, 0};
+  for (int i = 0; i < mob_cap; i++) {
+    global_passive_mobs[i] = temp_blank_entity;
+    global_hostile_mobs[i] = temp_blank_entity;
+  }
+
+  // generate new map
   struct Block temp_dirt_block = {dirt, false, 0};
   struct Block temp_grass_block = {grass_block, false, 0};
   for (int x_8 = 0; x_8 < (chunk_width << 3); x_8++) {
@@ -256,11 +303,49 @@ void draw_blocks() {
     }
   }
 }
-void draw_entity() {}
-void draw_entities() {}
+void draw_entity(struct Entity *entity) {
+  switch (entity->entity_type) {
+  case player:
+    draw_8x8_transparent(player_top_entity_texture, entity->x - global_camera.x,
+                         entity->y - global_camera.y + 8);
+    draw_8x8_transparent(player_bottom_entity_texture,
+                         entity->x - global_camera.x,
+                         entity->y - global_camera.y);
+    break;
+  case pig:
+    draw_8x8_transparent(pig_entity_texture, entity->x - global_camera.x,
+                         entity->y - global_camera.y);
+    break;
+  default:
+    return;
+  }
+}
+void draw_entities() {
+  for (int i = 0; i < mob_cap; i++)
+    draw_entity(&global_passive_mobs[i]);
+  for (int i = 0; i < mob_cap; i++)
+    draw_entity(&global_hostile_mobs[i]);
+  draw_entity(&global_player);
+}
 void draw_block_overlay(struct Block *block, int x_8, int y_8) {}
 void draw_block_overlays() {}
 void draw_map() {}
+void draw_8x8_transparent(short int *texture, int x, int y) {
+  int block_screen_x, block_screen_y, block_local_x, block_local_y;
+  for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+    block_screen_x = x + block_local_x;
+    if (block_screen_x < 0 || block_screen_x >= screen_width)
+      continue;
+    for (block_local_y = 0; block_local_y < 8; block_local_y++) {
+      block_screen_y = y + block_local_y;
+      if (block_screen_y < 0 || block_screen_y >= screen_height)
+        continue;
+      if (texture[block_local_x + (8 - 1 - block_local_y) * 8] != 0x0000)
+        plot_pixel(block_screen_x, block_screen_y,
+                   texture[block_local_x + (8 - 1 - block_local_y) * 8]);
+    }
+  }
+}
 
 // keyboard input
 void PS2_poll() {
@@ -306,6 +391,20 @@ void PS2_poll() {
       *PS2_data_ptr = 0xF4;
   }
 }
+
+// game logic
+void update_blocks() {}
+void update_entities() {
+  if (global_controller_inputs.left)
+    global_player.x -= 2;
+  if (global_controller_inputs.right)
+    global_player.x += 2;
+  if (global_player.x < 0)
+    global_player.x = 0;
+  else if (global_player.x >= chunk_width * 64)
+    global_player.x = chunk_width * 64 - 1;
+}
+
 // general rendering
 
 void clear_screen() {
