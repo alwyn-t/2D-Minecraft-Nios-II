@@ -102,12 +102,32 @@ void draw_block_overlay(struct Block *, int x_8, int y_8);
 void draw_block_overlays();
 void draw_map();
 
+// keyboard input
+struct controller_inputs {
+  bool left;
+  bool right;
+  bool up;
+  bool down;
+  bool jump;
+  bool sneak;
+  bool inventory;
+  bool inventory_toggle;
+  bool pause;
+  bool pause_toggle;
+  bool chat;
+  bool chat_toggle;
+};
+struct controller_inputs global_controller_inputs = {
+    false, false, false, false, false, false, false, false, false};
+void PS2_poll();
+
 // general rendering
 void clear_screen();
 void draw_line(int x0, int y0, int x1, int y1, short int line_color);
 void swap(int *a, int *b);
 void plot_pixel(int x, int y, short int line_color);
 void wait_for_vsync();
+void wait_for_vsync_and_swap();
 
 int main(void) {
   volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
@@ -123,20 +143,21 @@ int main(void) {
 
   /* set back pixel buffer to Buffer 2 */
   *(pixel_ctrl_ptr + 1) = (int)&Buffer2;
-  wait_for_vsync();
-  pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+  wait_for_vsync_and_swap();
   clear_screen(); // pixel_buffer_start points to the pixel buffer
-  wait_for_vsync();
-  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+  wait_for_vsync_and_swap();
   clear_screen();
 
   while (1) {
     printf("draw\n");
     // draw_block(&testBlock, 20, 1);
+    PS2_poll();
+    printf("a: %d d: %d pause toggle:%d\n", global_controller_inputs.left,
+           global_controller_inputs.right,
+           global_controller_inputs.pause_toggle);
     draw_blocks();
 
-    wait_for_vsync(); // swap front and back buffers on VGA vertical sync
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+    wait_for_vsync_and_swap();
   }
 }
 
@@ -241,6 +262,50 @@ void draw_block_overlay(struct Block *block, int x_8, int y_8) {}
 void draw_block_overlays() {}
 void draw_map() {}
 
+// keyboard input
+void PS2_poll() {
+  volatile int *PS2_data_ptr = (int *)0xFF200100;
+  int PS2_data = *PS2_data_ptr;
+  char byte0 = 0, byte1 = 0, byte2 = 0;
+  while (PS2_data & 0x8000) {
+    printf("%d\n", PS2_data & 0x8000);
+    byte2 = byte1;
+    byte1 = byte0;
+    byte0 = PS2_data & 0xFF;
+    PS2_data = *PS2_data_ptr;
+    if (byte0 == (char)0x1D) { // W
+      global_controller_inputs.up = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x1C) { // A
+      global_controller_inputs.left = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x1B) { // S
+      global_controller_inputs.down = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x23) { // D
+      global_controller_inputs.right = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x29) { // space
+      global_controller_inputs.jump = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x12) { // left shift
+      global_controller_inputs.sneak = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x24) { // E
+      if (!global_controller_inputs.inventory && (byte1 != (char)0x0F0))
+        global_controller_inputs.inventory_toggle =
+            !global_controller_inputs.inventory_toggle;
+      global_controller_inputs.inventory = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x76) { // escape
+      if (!global_controller_inputs.pause && (byte1 != (char)0x0F0))
+        global_controller_inputs.pause_toggle =
+            !global_controller_inputs.pause_toggle;
+      global_controller_inputs.pause = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x2C) { // T
+      if (!global_controller_inputs.chat && (byte1 != (char)0x0F0))
+        global_controller_inputs.chat_toggle =
+            !global_controller_inputs.chat_toggle;
+      global_controller_inputs.chat = byte1 != (char)0x0F0;
+    }
+    // mouse inserted; initialize sending of data
+    if ((byte1 == (char)0xAA) && (byte2 == (char)0x00))
+      *PS2_data_ptr = 0xF4;
+  }
+}
 // general rendering
 
 void clear_screen() {
@@ -305,4 +370,10 @@ void wait_for_vsync() {
   int status = *(pixel_ctrl_ptr + 3);
   while ((status & 0x01))
     status = *(pixel_ctrl_ptr + 3);
+}
+
+void wait_for_vsync_and_swap() {
+  volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
+  wait_for_vsync();
+  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
 }
