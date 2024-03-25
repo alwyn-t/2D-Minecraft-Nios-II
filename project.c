@@ -340,6 +340,8 @@ enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow };
 struct Entity {
   int x;
   int y;
+  int velocity_x;
+  int velocity_y;
   enum EntityType entity_type;
   int animation_frame_state;
 };
@@ -420,13 +422,13 @@ void wait_for_vsync_and_swap();
 
 int main(void) {
   volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
-  // declare other variables(not shown)	
+  // declare other variables(not shown)
   generate_map();
 
   /* set front pixel buffer to Buffer 1 */
   *(pixel_ctrl_ptr + 1) =
       (int)&Buffer1; // first store the address in the  back buffer
-	
+
   /* now, swap the front/back buffers, to set the front buffer location */
   wait_for_vsync();
 
@@ -436,17 +438,17 @@ int main(void) {
   load_menu(); // pixel_buffer_start points to the pixel buffer
   wait_for_vsync_and_swap();
   clear_screen();
-	
+
   //Main menu
   game_start = false;
   while(!game_start){
 	PS2_poll();
-  }	
+  }
 
   //Delete main menu
   wait_for_vsync_and_swap();
   clear_screen();
-	
+
   while (1) {
     printf("draw\n");
     draw_block(&testBlock, 20, 1);
@@ -501,9 +503,9 @@ void generate_map() {
       }
     }
   }
-  struct Entity temp_player = {10 * 8, 32 * 8, player, 0};
+  struct Entity temp_player = {10 * 8, 32 * 8, 0, 0, player, 0};
   global_player = temp_player;
-  struct Entity temp_blank_entity = {0, 0, unassigned_entity, 0};
+  struct Entity temp_blank_entity = {0, 0, 0, 0, unassigned_entity, 0};
   for (int i = 0; i < mob_cap; i++) {
     global_passive_mobs[i] = temp_blank_entity;
     global_hostile_mobs[i] = temp_blank_entity;
@@ -629,11 +631,11 @@ void PS2_poll() {
     byte1 = byte0;
     byte0 = PS2_data & 0xFF;
     PS2_data = *PS2_data_ptr;
-	  
-	  
-    if (!game_start) { //Start Game	  
-	  game_start = true;	 
-	}	
+
+
+    if (!game_start) { //Start Game
+	  game_start = true;
+	}
       else if (byte0 == (char)0x1D) { // W
       global_controller_inputs.up = byte1 != (char)0x0F0;
     } else if (byte0 == (char)0x1C) { // A
@@ -671,14 +673,33 @@ void PS2_poll() {
 // game logic
 void update_blocks() {}
 void update_entities() {
+	global_player.velocity_x = 0;
   if (global_controller_inputs.left)
-    global_player.x -= 2;
+  	global_player.velocity_x -= 2;
   if (global_controller_inputs.right)
-    global_player.x += 2;
+  	global_player.velocity_x += 2;
+  global_player.x += global_player.velocity_x;
+  // if collision set velocity y to 0
+  // else add gravity
+  if (global_player.velocity_y > -10)
+  	global_player.velocity_y -= 1;
+  global_player.y += global_player.velocity_y;
   if (global_player.x < 0)
     global_player.x = 0;
   else if (global_player.x >= chunk_width * 64)
     global_player.x = chunk_width * 64 - 1;
+
+  // global camera
+  global_camera.x = global_player.x - screen_width / 2;
+  if (global_camera.x < 0)
+  	global_camera.x = 0;
+  else if (global_camera.x >= chunk_width * 64 * 8 - screen_width)
+   	global_camera.x = chunk_width * 64 - screen_width - 1;
+  global_camera.y = global_player.y - screen_height / 2;
+  if (global_camera.y < 0)
+  	global_camera.y = 0;
+  else if (global_camera.y >= 128 * 8 - screen_width)
+   	global_camera.y = 128 * 8 - screen_width - 1;
 }
 
 // general rendering
@@ -742,10 +763,10 @@ void plot_pixel(int x, int y, short int line_color) {
 void plot_pixel_vertical(int x, int y, short int line_color)
 {
     short int *one_pixel_address;
-	
-	one_pixel_address = (short *)(pixel_buffer_start 
+
+	one_pixel_address = (short *)(pixel_buffer_start
 								  + (y << 10) + (x << 1));
-	
+
 	*one_pixel_address = line_color;
 }
 
