@@ -335,7 +335,7 @@ struct Block {
   int animation_frame_state;
 };
 
-struct Block testBlock = {stone, false, 0};
+struct Block testBlock = {stone, true, 0};
 enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow };
 struct Entity {
   int x;
@@ -402,6 +402,7 @@ struct controller_inputs {
   bool pause_toggle;
   bool chat;
   bool chat_toggle;
+  bool place_block;
 };
 struct controller_inputs global_controller_inputs = {
     false, false, false, false, false, false, false, false, false};
@@ -437,28 +438,30 @@ int main(void) {
   wait_for_vsync_and_swap();
   load_menu(); // pixel_buffer_start points to the pixel buffer
   wait_for_vsync_and_swap();
-  clear_screen();
+  load_menu();
 
   //Main menu
   game_start = false;
   while(!game_start){
 	PS2_poll();
+  wait_for_vsync();
   }
 
-  //Delete main menu
-  wait_for_vsync_and_swap();
-  clear_screen();
-
   while (1) {
-    printf("draw\n");
-    draw_block(&testBlock, 20, 1);
+    //printf("draw\n");
     PS2_poll();
     update_entities();
-    printf("a: %d d: %d pause toggle:%d\n", global_controller_inputs.left,
-           global_controller_inputs.right,
-           global_controller_inputs.pause_toggle);
+    update_blocks();
+    //printf("a: %d d: %d pause toggle:%d\n", global_controller_inputs.left,
+          // global_controller_inputs.right,
+           //global_controller_inputs.pause_toggle);
     draw_blocks();
     draw_entities();
+
+    //setBlockInChunk(&global_world.chunk_array[0], 30, 32, testBlock);
+    //setBlockInChunk(&global_world.chunk_array[0], 31, 32, testBlock);
+    //draw_block(&testBlock, 20, 1);
+    //draw_block(&testBlock, 20, 2);
 
     wait_for_vsync_and_swap();
   }
@@ -521,7 +524,7 @@ void generate_map() {
                       (y_8 != 31) ? temp_dirt_block : temp_grass_block);
     }
   }
-  setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
+  //setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
 }
 void load_map() {}
 void save_map() {}
@@ -626,7 +629,7 @@ void PS2_poll() {
   int PS2_data = *PS2_data_ptr;
   char byte0 = 0, byte1 = 0, byte2 = 0;
   while (PS2_data & 0x8000) {
-    printf("%d\n", PS2_data & 0x8000);
+    //printf("%d\n", PS2_data & 0x8000);
     byte2 = byte1;
     byte1 = byte0;
     byte0 = PS2_data & 0xFF;
@@ -663,7 +666,10 @@ void PS2_poll() {
         global_controller_inputs.chat_toggle =
             !global_controller_inputs.chat_toggle;
       global_controller_inputs.chat = byte1 != (char)0x0F0;
+    } else if (byte0 == (char)0x4D) { //Placing blocks for now is P will work on mouse after
+      global_controller_inputs.place_block = byte1 != (char)0x0F0;
     }
+
     // mouse inserted; initialize sending of data
     if ((byte1 == (char)0xAA) && (byte2 == (char)0x00))
       *PS2_data_ptr = 0xF4;
@@ -671,7 +677,25 @@ void PS2_poll() {
 }
 
 // game logic
-void update_blocks() {}
+void update_blocks() {
+  if (global_controller_inputs.place_block){
+    printf("bruh2\n");
+    global_controller_inputs.place_block = false;
+
+    int x = global_player.x/8;
+    int y = global_player.y/8;
+
+    printf(" %d and %d \n", x, y);
+
+    if(x < 40){
+     setBlockInChunk(&global_world.chunk_array[0], x+2, y, testBlock);
+    }
+
+  }
+
+}
+
+
 void update_entities() {
 	global_player.velocity_x = 0;
   if (global_controller_inputs.left)
