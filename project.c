@@ -697,17 +697,41 @@ void update_blocks() {
 
 
 void update_entities() {
-	global_player.velocity_x = 0;
-  if (global_controller_inputs.left)
+   global_player.velocity_x = 0;
+	
+  int x_loc = global_player.x;
+  int y_loc = global_player.y;
+
+
+  struct Chunk *current_chunk = getChunkFromPosition(x_loc>>3);
+  struct Block *player_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , y_loc>>3);
+  struct Block *player_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , y_loc>>3);
+  struct Block *player_top_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , (y_loc>>3)+1);
+  struct Block *player_top_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , (y_loc>>3)+1);	
+  //Top is needed for jump
+  //struct Block *player_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) );
+  struct Block *player_bottom = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) - 1);		
+		
+  if (global_controller_inputs.left && (*player_left).block_type == 0 && (*player_top_left).block_type == 0)
   	global_player.velocity_x -= 2;
-  if (global_controller_inputs.right)
+  else if(global_controller_inputs.left)
+	global_player.velocity_x = 0;
+  if (global_controller_inputs.right  && (*player_right).block_type == 0 && (*player_top_right).block_type == 0)
   	global_player.velocity_x += 2;
+  else if(global_controller_inputs.right)
+	global_player.velocity_x = 0;
+	
   global_player.x += global_player.velocity_x;
+	
   // if collision set velocity y to 0
   // else add gravity
-  if (global_player.velocity_y > -10)
+  if (global_player.velocity_y > -10 && (*player_bottom).block_type == 0)
   	global_player.velocity_y -= 1;
+  else if((*player_bottom).block_type != 0)	
+	 global_player.velocity_y = 0;	
   global_player.y += global_player.velocity_y;
+	
+  //World Boundaries	
   if (global_player.x < 0)
     global_player.x = 0;
   else if (global_player.x >= chunk_width * 64)
