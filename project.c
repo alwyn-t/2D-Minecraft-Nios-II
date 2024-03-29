@@ -336,6 +336,8 @@ struct Block {
 };
 
 struct Block testBlock = {stone, true, 0};
+struct Block airBlock = {air, true, 0};
+
 enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow };
 struct Entity {
   int x;
@@ -404,9 +406,10 @@ struct controller_inputs {
   bool chat;
   bool chat_toggle;
   bool place_block;
+  bool break_block; //14
 };
 struct controller_inputs global_controller_inputs = {
-    false, false, false, false, false, false, false, false, false};
+    false, false, false, false, false, false, false, false, false, false, false, false, false, false};
 void PS2_poll();
 
 // game logic
@@ -636,10 +639,10 @@ void PS2_poll() {
     byte0 = PS2_data & 0xFF;
     PS2_data = *PS2_data_ptr;
 
-
+    //printf("%d\n", PS2_data);
     if (!game_start) { //Start Game
 	  game_start = true;
-	}
+	  }
       else if (byte0 == (char)0x1D) { // W
       global_controller_inputs.up = byte1 != (char)0x0F0;
     } else if (byte0 == (char)0x1C) { // A
@@ -670,29 +673,54 @@ void PS2_poll() {
     } else if (byte0 == (char)0x4D) { //Placing blocks for now is P will work on mouse after
       global_controller_inputs.place_block = byte1 != (char)0x0F0;
     }
+    else if (byte0 == (char)0x44) { //Breaking Blocks for Now is O
+     global_controller_inputs.break_block = byte1 != (char)0x0F0;
+    }
 
     // mouse inserted; initialize sending of data
-    if ((byte1 == (char)0xAA) && (byte2 == (char)0x00))
-      *PS2_data_ptr = 0xF4;
-  }
+    // else if ((byte1 == (char)0xAA) && (byte2 == (char)0x00)){
+    //   *PS2_data_ptr = 0xF4;   
+    //   global_controller_inputs.left = byte1 != (char)0x0F0;
+    // }
+
+  } 
 }
+
+
+
 
 // game logic
 void update_blocks() {
+
+  //Place block
   if (global_controller_inputs.place_block){
     global_controller_inputs.place_block = false;
 
     int x = global_player.x/8;
     int y = global_player.y/8;
 
-    printf(" %d and %d \n", x, y);
 
+    //Break Block
     if(global_player.direction){
      setBlockInChunk(&global_world.chunk_array[0], x+2, y, testBlock);
     }
 	else{
 	setBlockInChunk(&global_world.chunk_array[0], x-1, y, testBlock);
 	}
+
+  }
+  
+  if (global_controller_inputs.break_block){
+    global_controller_inputs.break_block = false;
+
+    int x = global_player.x/8;
+    int y = global_player.y/8;
+    if(global_player.direction){
+     setBlockInChunk(&global_world.chunk_array[0], x+2, y, airBlock);
+    }
+	  else{
+	  setBlockInChunk(&global_world.chunk_array[0], x-1, y, airBlock);
+	  }
 
   }
 
@@ -735,7 +763,7 @@ void update_entities() {
 	global_player.direction = true; 
   }	  
   if ( (global_controller_inputs.up || global_controller_inputs.jump)  && (*player_top).block_type == 0 
-	  && (*player_double_top).block_type == 0 && (*player_bottom).block_type != 0 ){
+	  && ( (*player_double_top).block_type == 0 && (*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0) ){
   	global_player.velocity_y = 8;
 	global_player.y += 16;
   }	
