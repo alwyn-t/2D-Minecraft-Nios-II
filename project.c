@@ -344,6 +344,7 @@ struct Entity {
   int velocity_y;
   enum EntityType entity_type;
   int animation_frame_state;
+  bool direction; //True for right, false for left
 };
 
 struct Entity global_player;
@@ -506,7 +507,7 @@ void generate_map() {
       }
     }
   }
-  struct Entity temp_player = {10 * 8, 32 * 8, 0, 0, player, 0};
+  struct Entity temp_player = {10 * 8, 32 * 8, 0, 0, player, 0, true};
   global_player = temp_player;
   struct Entity temp_blank_entity = {0, 0, 0, 0, unassigned_entity, 0};
   for (int i = 0; i < mob_cap; i++) {
@@ -679,7 +680,6 @@ void PS2_poll() {
 // game logic
 void update_blocks() {
   if (global_controller_inputs.place_block){
-    printf("bruh2\n");
     global_controller_inputs.place_block = false;
 
     int x = global_player.x/8;
@@ -687,9 +687,12 @@ void update_blocks() {
 
     printf(" %d and %d \n", x, y);
 
-    if(x < 40){
+    if(global_player.direction){
      setBlockInChunk(&global_world.chunk_array[0], x+2, y, testBlock);
     }
+	else{
+	setBlockInChunk(&global_world.chunk_array[0], x-1, y, testBlock);
+	}
 
   }
 
@@ -715,15 +718,22 @@ void update_entities() {
   struct Block *player_bottom_right = getBlockFromChunk(current_chunk, (x_loc>>3) +1 , (y_loc>>3) - 1);	
   struct Block *player_double_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 3);			
 	
-  if (global_controller_inputs.left && (*player_spot).block_type == 0 && (*player_spot_top).block_type == 0)
+  if (global_controller_inputs.left && (*player_spot).block_type == 0 && (*player_spot_top).block_type == 0){
   	global_player.velocity_x -= 2;
-  else if(global_controller_inputs.left)
+	global_player.direction = false;
+  }	 
+  else if(global_controller_inputs.left){
 	global_player.velocity_x = 0;
-  if (global_controller_inputs.right  && (*player_right).block_type == 0 && (*player_top_right).block_type == 0)
+	global_player.direction = false;  
+  }	  
+  if (global_controller_inputs.right  && (*player_right).block_type == 0 && (*player_top_right).block_type == 0){
   	global_player.velocity_x += 2;
-  else if(global_controller_inputs.right)
+	global_player.direction = true; 
+  }	  
+  else if(global_controller_inputs.right){
 	global_player.velocity_x = 0;
-	
+	global_player.direction = true; 
+  }	  
   if ( (global_controller_inputs.up || global_controller_inputs.jump)  && (*player_top).block_type == 0 
 	  && (*player_double_top).block_type == 0 && (*player_bottom).block_type != 0 ){
   	global_player.velocity_y = 8;
