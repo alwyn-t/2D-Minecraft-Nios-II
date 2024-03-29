@@ -704,15 +704,18 @@ void update_entities() {
 
 
   struct Chunk *current_chunk = getChunkFromPosition(x_loc>>3);
-  struct Block *player_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , y_loc>>3);
-  struct Block *player_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , y_loc>>3);
+  struct Block *player_spot = getBlockFromChunk(current_chunk, (x_loc>>3), y_loc>>3);
+  struct Block *player_spot_top = getBlockFromChunk(current_chunk, (x_loc>>3), (y_loc>>3)+1);
+  struct Block *player_right = getBlockFromChunk(current_chunk, (x_loc>>3) + 1, y_loc>>3);
+  //struct Block *player_left = getBlockFromChunk(current_chunk, (x_loc>>3) - 1 , y_loc>>3);
   struct Block *player_top_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , (y_loc>>3)+1);
-  struct Block *player_top_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , (y_loc>>3)+1);	
-  //Top is needed for jump
-  //struct Block *player_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) );
+  //struct Block *player_top_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , (y_loc>>3)+1);	
+  struct Block *player_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 2 );
   struct Block *player_bottom = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) - 1);		
-		
-  if (global_controller_inputs.left && (*player_left).block_type == 0 && (*player_top_left).block_type == 0)
+  struct Block *player_bottom_right = getBlockFromChunk(current_chunk, (x_loc>>3) +1 , (y_loc>>3) - 1);	
+  struct Block *player_double_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 3);			
+	
+  if (global_controller_inputs.left && (*player_spot).block_type == 0 && (*player_spot_top).block_type == 0)
   	global_player.velocity_x -= 2;
   else if(global_controller_inputs.left)
 	global_player.velocity_x = 0;
@@ -721,14 +724,25 @@ void update_entities() {
   else if(global_controller_inputs.right)
 	global_player.velocity_x = 0;
 	
+  if ( (global_controller_inputs.up || global_controller_inputs.jump)  && (*player_top).block_type == 0 
+	  && (*player_double_top).block_type == 0 && (*player_bottom).block_type != 0 ){
+  	global_player.velocity_y = 8;
+	global_player.y += 16;
+  }	
+  else if((global_controller_inputs.up || global_controller_inputs.jump) )
+	global_player.velocity_y = 0;	
+	
   global_player.x += global_player.velocity_x;
 	
   // if collision set velocity y to 0
   // else add gravity
-  if (global_player.velocity_y > -10 && (*player_bottom).block_type == 0)
+  if (global_player.velocity_y > -10 && ((*player_bottom).block_type == 0 && (*player_bottom_right).block_type == 0 ))
   	global_player.velocity_y -= 1;
-  else if((*player_bottom).block_type != 0)	
-	 global_player.velocity_y = 0;	
+  else if((*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0){	
+	 global_player.velocity_y = 0;
+	 global_player.y = ((global_player.y >> 3) << 3);
+  }	 
+	
   global_player.y += global_player.velocity_y;
 	
   //World Boundaries	
