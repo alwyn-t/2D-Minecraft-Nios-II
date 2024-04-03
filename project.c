@@ -66,7 +66,7 @@ short int player_top_entity_texture[64] = {
 short int player_bottom_entity_texture[64] = {
     0x7287, 0x6A26, 0x33F0, 0x230C, 0x2BAF, 0x33F0, 0x7287, 0x6A26,
     0x6A26, 0x7287, 0x2BAF, 0x33F0, 0x230C, 0x2BAF, 0x6A26, 0x6A26,
-    0x7287, 0x6A26, 0x294D, 0x296E, 0x294D, 0x0000, 0x6A26, 0x7287,
+    0x7287, 0x6A26, 0x294D, 0x296E, 0x294D, 0x2BAF, 0x6A26, 0x7287,
     0x0000, 0x0000, 0x296E, 0x296E, 0x296E, 0x294D, 0x0000, 0x0000,
     0x0000, 0x0000, 0x212C, 0x212C, 0x294D, 0x212C, 0x0000, 0x0000,
     0x0000, 0x0000, 0x294D, 0x294D, 0x296E, 0x294D, 0x0000, 0x0000,
@@ -390,8 +390,16 @@ void draw_block_overlay(struct Block *, int x_8, int y_8);
 void draw_block_overlays();
 void draw_map();
 void draw_8x8_transparent(short int *, int x, int y);
+void draw_crosshair();
 
+// IO
+int switch_poll();
+void LEDR(int data);
 // keyboard input
+bool PS2_port1_keyboard = true;
+int PS2_port1_mouse_counter = 0;
+bool PS2_port2_keyboard = true;
+int PS2_port2_mouse_counter = 0;
 struct controller_inputs {
   bool left;
   bool right;
@@ -407,10 +415,14 @@ struct controller_inputs {
   bool chat_toggle;
   bool place_block;
   bool break_block; //14
+  int crosshair_x;
+  int crosshair_y;
 };
 struct controller_inputs global_controller_inputs = {
-    false, false, false, false, false, false, false, false, false, false, false, false, false, false};
-void PS2_poll();
+    false, false, false, false, false, false, false, false, false, false, false, false, false, false, screen_width >> 1,  screen_height >> 1};
+void PS2_port1_poll();
+void PS2_port2_poll();
+void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_counter);
 
 // game logic
 void update_blocks();
@@ -426,264 +438,306 @@ void wait_for_vsync();
 void wait_for_vsync_and_swap();
 
 int main(void) {
-  volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
-  // declare other variables(not shown)
-  generate_map();
+	volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
+	// declare other variables(not shown)
+	generate_map();
 
-  /* set front pixel buffer to Buffer 1 */
-  *(pixel_ctrl_ptr + 1) =
-      (int)&Buffer1; // first store the address in the  back buffer
+	/* set front pixel buffer to Buffer 1 */
+	*(pixel_ctrl_ptr + 1) = (int)&Buffer1; // first store the address in the  back buffer
 
-  /* now, swap the front/back buffers, to set the front buffer location */
-  wait_for_vsync();
+	/* now, swap the front/back buffers, to set the front buffer location */
+	wait_for_vsync();
 
-  /* set back pixel buffer to Buffer 2 */
-  *(pixel_ctrl_ptr + 1) = (int)&Buffer2;
-  wait_for_vsync_and_swap();
-  load_menu(); // pixel_buffer_start points to the pixel buffer
-  wait_for_vsync_and_swap();
-  load_menu();
+	/* set back pixel buffer to Buffer 2 */
+	*(pixel_ctrl_ptr + 1) = (int)&Buffer2;
+	wait_for_vsync_and_swap();
+	load_menu(); // pixel_buffer_start points to the pixel buffer
+	wait_for_vsync_and_swap();
+	load_menu();
 
-  //Main menu
-  game_start = false;
-  while(!game_start){
-	PS2_poll();
-  wait_for_vsync();
-  }
+	//Main menu
+	game_start = false;
+	while(!game_start){
+		LEDR(switch_poll());
+		PS2_port1_poll();
+		wait_for_vsync();
+	}
 
-  while (1) {
-    //printf("draw\n");
-    PS2_poll();
-    update_entities();
-    update_blocks();
-    //printf("a: %d d: %d pause toggle:%d\n", global_controller_inputs.left,
-          // global_controller_inputs.right,
-           //global_controller_inputs.pause_toggle);
-    draw_blocks();
-    draw_entities();
+	while (1) {
+		//printf("draw\n");
+		LEDR(switch_poll());
+		PS2_port1_poll();
+		PS2_port2_poll();
+		update_entities();
+		update_blocks();
+		//printf("a: %d d: %d pause toggle:%d\n", global_controller_inputs.left,
+		// global_controller_inputs.right,
+		//global_controller_inputs.pause_toggle);
+		draw_blocks();
+		draw_entities();
+		draw_crosshair();
 
-    //setBlockInChunk(&global_world.chunk_array[0], 30, 32, testBlock);
-    //setBlockInChunk(&global_world.chunk_array[0], 31, 32, testBlock);
-    //draw_block(&testBlock, 20, 1);
-    //draw_block(&testBlock, 20, 2);
+		//setBlockInChunk(&global_world.chunk_array[0], 30, 32, testBlock);
+		//setBlockInChunk(&global_world.chunk_array[0], 31, 32, testBlock);
+		//draw_block(&testBlock, 20, 1);
+		//draw_block(&testBlock, 20, 2);
 
-    wait_for_vsync_and_swap();
-  }
+		wait_for_vsync_and_swap();
+	}
 }
 
 // game definitions
 struct Block *getBlockFromChunk(struct Chunk *chunk, int x_8, int y_8) {
-  return &chunk->block_array[x_8 + y_8 * 128];
+	return &chunk->block_array[(x_8 & 0x3F) + (y_8 << 6)];
 }
 void setBlockInChunk(struct Chunk *chunk, int x_8, int y_8,
                      struct Block block) {
-  struct Block *target_block = getBlockFromChunk(chunk, x_8, y_8);
-  target_block->block_type = block.block_type;
-  target_block->overlay = block.overlay;
-  target_block->animation_frame_state = block.animation_frame_state;
+	struct Block *target_block = getBlockFromChunk(chunk, x_8, y_8);
+	target_block->block_type = block.block_type;
+	target_block->overlay = block.overlay;
+	target_block->animation_frame_state = block.animation_frame_state;
 }
 struct Chunk *getChunkFromPosition(int x_8) {
-  int chunk_index = (x_8 >> 6);
-  if (chunk_index < 0 || chunk_index >= chunk_width)
-    return nullptr;
-  else
-    return &global_world.chunk_array[chunk_index];
+	int chunk_index = (x_8 >> 6);
+	if (chunk_index < 0 || chunk_index >= chunk_width)
+		return nullptr;
+	else
+		return &global_world.chunk_array[chunk_index];
 }
 
 void load_menu() {
 	int y, x;
-    for (x = 0; x < screen_width; x++)
-        for (y = 0; y < screen_height; y++)
-            plot_pixel_vertical (x, y, menu[y][x]);
+	for (x = 0; x < screen_width; x++)
+		for (y = 0; y < screen_height; y++)
+			plot_pixel_vertical (x, y, menu[y][x]);
 }
 
 
 // game generation
 void generate_map() {
-  // erase old map
-  struct Block temp_air_block = {air, false, 0};
-  for (int i = 0; i < chunk_width; i++) {
-    struct Chunk *temp_chunk = &global_world.chunk_array[i];
-    for (int x_8 = 0; x_8 < 64; x_8++) {
-      for (int y_8 = 0; y_8 < 128; y_8++) {
-        setBlockInChunk(temp_chunk, x_8, y_8, temp_air_block);
-      }
-    }
-  }
-  struct Entity temp_player = {10 * 8, 32 * 8, 0, 0, player, 0, true};
-  global_player = temp_player;
-  struct Entity temp_blank_entity = {0, 0, 0, 0, unassigned_entity, 0};
-  for (int i = 0; i < mob_cap; i++) {
-    global_passive_mobs[i] = temp_blank_entity;
-    global_hostile_mobs[i] = temp_blank_entity;
-  }
+	// erase old map
+	struct Block temp_air_block = {air, false, 0};
+	for (int i = 0; i < chunk_width; i++) {
+		struct Chunk *temp_chunk = &global_world.chunk_array[i];
+		for (int x_8 = 0; x_8 < 64; x_8++) {
+			for (int y_8 = 0; y_8 < 128; y_8++) {
+				setBlockInChunk(temp_chunk, x_8, y_8, temp_air_block);
+			}
+		}
+	}
+	struct Entity temp_player = {10 * 8, 32 * 8, 0, 0, player, 0, true};
+	global_player = temp_player;
+	struct Entity temp_blank_entity = {0, 0, 0, 0, unassigned_entity, 0};
+	for (int i = 0; i < mob_cap; i++) {
+		global_passive_mobs[i] = temp_blank_entity;
+		global_hostile_mobs[i] = temp_blank_entity;
+	}
 
-  // generate new map
-  struct Block temp_dirt_block = {dirt, false, 0};
-  struct Block temp_grass_block = {grass_block, false, 0};
-  for (int x_8 = 0; x_8 < (chunk_width << 3); x_8++) {
-    struct Chunk *temp_chunk = getChunkFromPosition(x_8);
-    for (int y_8 = 0; y_8 < 32; y_8++) {
-      setBlockInChunk(temp_chunk, x_8, y_8,
-                      (y_8 != 31) ? temp_dirt_block : temp_grass_block);
-    }
-  }
-  //setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
+	// generate new map
+	struct Block temp_dirt_block = {dirt, false, 0};
+	struct Block temp_grass_block = {grass_block, false, 0};
+	for (int x_8 = 0; x_8 < (chunk_width << 6); x_8++) {
+		struct Chunk *temp_chunk = getChunkFromPosition(x_8);
+		for (int y_8 = 0; y_8 < 32; y_8++) {
+			setBlockInChunk(temp_chunk, x_8, y_8, (y_8 != 31) ? temp_dirt_block : temp_grass_block);
+		}
+	}
+	//setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
+	setBlockInChunk(getChunkFromPosition(50), 50, 32, temp_dirt_block);
 }
 void load_map() {}
 void save_map() {}
 
 // game rendering
 void draw_block(struct Block *block, int x_8, int y_8) {
-  int corner_of_block_screen_x = (x_8 << 3) - global_camera.x;
-  int corner_of_block_screen_y = (y_8 << 3) - global_camera.y;
+	int corner_of_block_screen_x = (x_8 << 3) - global_camera.x;
+	int corner_of_block_screen_y = (y_8 << 3) - global_camera.y;
 
-  short int *texture_array;
-  switch (block->block_type) {
-  case grass_block:
-    texture_array = grass_block_texture;
-    break;
-  case dirt:
-    texture_array = dirt_block_texture;
-    break;
-  case air:
-    texture_array = air_block_texture;
-    break;
-  default:
-    texture_array = dirt_block_texture;
-    break;
-  }
-  // screen refers to screen position, local refers to pixel within the block
-  int block_screen_x, block_screen_y, block_local_x, block_local_y;
-  for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-    block_screen_x = corner_of_block_screen_x + block_local_x;
-    if (block_screen_x < 0 || block_screen_x >= screen_width)
-      continue;
-    for (block_local_y = 0; block_local_y < 8; block_local_y++) {
-      block_screen_y = corner_of_block_screen_y + block_local_y;
-      if (block_screen_y < 0 || block_screen_y >= screen_height)
-        continue;
-      plot_pixel(block_screen_x, block_screen_y,
-                 texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
-    }
-  }
+	short int *texture_array;
+	switch (block->block_type) {
+		case grass_block:
+			texture_array = grass_block_texture;
+			break;
+		case dirt:
+			texture_array = dirt_block_texture;
+			break;
+		case air:
+			texture_array = air_block_texture;
+			break;
+		default:
+			texture_array = dirt_block_texture;
+			break;
+	}
+	// screen refers to screen position, local refers to pixel within the block
+	int block_screen_x, block_screen_y, block_local_x, block_local_y;
+	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+		block_screen_x = corner_of_block_screen_x + block_local_x;
+		if (block_screen_x < 0 || block_screen_x >= screen_width)
+			continue;
+		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
+			block_screen_y = corner_of_block_screen_y + block_local_y;
+			if (block_screen_y < 0 || block_screen_y >= screen_height)
+				continue;
+			plot_pixel(block_screen_x, block_screen_y,
+			texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
+		}
+	}
 }
 void draw_blocks() {
-  int camera_x_8 = global_camera.x >> 3;
-  int camera_y_8 = global_camera.y >> 3;
-  for (int local_x_8 = 0; local_x_8 < (screen_width >> 3) + 1; local_x_8++) {
-    int x_8 = camera_x_8 + local_x_8;
-    struct Chunk *temp_chunk = getChunkFromPosition(x_8);
-    if (temp_chunk != nullptr) {
-      for (int local_y_8 = 0; local_y_8 < (screen_height >> 3) + 1;
-           local_y_8++) {
-        int y_8 = camera_y_8 + local_y_8;
-        draw_block(getBlockFromChunk(temp_chunk, x_8 % 64, y_8), x_8, y_8);
-      }
-    }
-  }
+	int camera_x_8 = global_camera.x >> 3;
+	int camera_y_8 = global_camera.y >> 3;
+	for (int local_x_8 = 0; local_x_8 < (screen_width >> 3) + 1; local_x_8++) {
+		int x_8 = camera_x_8 + local_x_8;
+		struct Chunk *temp_chunk = getChunkFromPosition(x_8);
+		if (temp_chunk != nullptr) {
+			for (int local_y_8 = 0; local_y_8 < (screen_height >> 3) + 1; local_y_8++) {
+				int y_8 = camera_y_8 + local_y_8;
+				draw_block(getBlockFromChunk(temp_chunk, x_8 & 0x3F, y_8), x_8, y_8);
+			}
+		}
+	}
 }
 void draw_entity(struct Entity *entity) {
-  switch (entity->entity_type) {
-  case player:
-    draw_8x8_transparent(player_top_entity_texture, entity->x - global_camera.x,
-                         entity->y - global_camera.y + 8);
-    draw_8x8_transparent(player_bottom_entity_texture,
-                         entity->x - global_camera.x,
-                         entity->y - global_camera.y);
-    break;
-  case pig:
-    draw_8x8_transparent(pig_entity_texture, entity->x - global_camera.x,
-                         entity->y - global_camera.y);
-    break;
-  default:
-    return;
-  }
+	switch (entity->entity_type) {
+	case player:
+		draw_8x8_transparent(player_top_entity_texture, entity->x - global_camera.x, entity->y - global_camera.y + 8);
+		draw_8x8_transparent(player_bottom_entity_texture, entity->x - global_camera.x, entity->y - global_camera.y);
+	break;
+	case pig:
+		draw_8x8_transparent(pig_entity_texture, entity->x - global_camera.x, entity->y - global_camera.y);
+		break;
+	default:
+		return;
+	}
 }
 void draw_entities() {
-  for (int i = 0; i < mob_cap; i++)
-    draw_entity(&global_passive_mobs[i]);
-  for (int i = 0; i < mob_cap; i++)
-    draw_entity(&global_hostile_mobs[i]);
-  draw_entity(&global_player);
+	for (int i = 0; i < mob_cap; i++)
+		draw_entity(&global_passive_mobs[i]);
+	for (int i = 0; i < mob_cap; i++)
+		draw_entity(&global_hostile_mobs[i]);
+	draw_entity(&global_player);
 }
 void draw_block_overlay(struct Block *block, int x_8, int y_8) {}
 void draw_block_overlays() {}
 void draw_map() {}
 void draw_8x8_transparent(short int *texture, int x, int y) {
-  int block_screen_x, block_screen_y, block_local_x, block_local_y;
-  for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-    block_screen_x = x + block_local_x;
-    if (block_screen_x < 0 || block_screen_x >= screen_width)
-      continue;
-    for (block_local_y = 0; block_local_y < 8; block_local_y++) {
-      block_screen_y = y + block_local_y;
-      if (block_screen_y < 0 || block_screen_y >= screen_height)
-        continue;
-      if (texture[block_local_x + (8 - 1 - block_local_y) * 8] != 0x0000)
-        plot_pixel(block_screen_x, block_screen_y,
-                   texture[block_local_x + (8 - 1 - block_local_y) * 8]);
-    }
-  }
+	int block_screen_x, block_screen_y, block_local_x, block_local_y;
+	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+		block_screen_x = x + block_local_x;
+	if (block_screen_x < 0 || block_screen_x >= screen_width)
+		continue;
+	for (block_local_y = 0; block_local_y < 8; block_local_y++) {
+		block_screen_y = y + block_local_y;
+		if (block_screen_y < 0 || block_screen_y >= screen_height)
+			continue;
+		if (texture[block_local_x + (8 - 1 - block_local_y) * 8] != 0x0000)
+			plot_pixel(block_screen_x, block_screen_y, texture[block_local_x + (8 - 1 - block_local_y) * 8]);
+		}
+	}
+}
+void draw_crosshair() {
+	for (int x = -3; x <= 4; x++) {
+		plot_pixel(global_controller_inputs.crosshair_x + x, global_controller_inputs.crosshair_y + 1, cold_steel_white);
+		plot_pixel(global_controller_inputs.crosshair_x + x, global_controller_inputs.crosshair_y + 0, cold_steel_white);
+	}
+	for (int y = -3; y <= 4; y++) {
+		plot_pixel(global_controller_inputs.crosshair_x + 1, global_controller_inputs.crosshair_y + y, cold_steel_white);
+		plot_pixel(global_controller_inputs.crosshair_x + 0, global_controller_inputs.crosshair_y + y, cold_steel_white);
+	}
+}
+
+// ================== IO ================ //
+int switch_poll() {
+	volatile int *switch_ptr = (int*)0xFF200040;
+	int data = *switch_ptr & 0x3FF;
+	PS2_port1_keyboard = data & 0x200;
+	PS2_port2_keyboard = data & 0x100;
+	// if (PS2_port1_keyboard)
+	// 	printf("port 1 keyboard!\n");
+	// if (PS2_port2_keyboard)
+	// 	printf("port 2 keyboard!\n");
+	return data;
+}
+
+void LEDR(int data) {
+	volatile int *LEDR_ptr = (int*)0xFF200000;
+	*LEDR_ptr = data;
 }
 
 // keyboard input
-void PS2_poll() {
-  volatile int *PS2_data_ptr = (int *)0xFF200100;
-  int PS2_data = *PS2_data_ptr;
-  char byte0 = 0, byte1 = 0, byte2 = 0;
-  while (PS2_data & 0x8000) {
-    //printf("%d\n", PS2_data & 0x8000);
-    byte2 = byte1;
-    byte1 = byte0;
-    byte0 = PS2_data & 0xFF;
-    PS2_data = *PS2_data_ptr;
+void PS2_port1_poll() {
+	PS2_poll((int *)0xFF200100, &PS2_port1_keyboard, &PS2_port1_mouse_counter);
+}
+void PS2_port2_poll() {
+	PS2_poll((int *)0xFF200108, &PS2_port2_keyboard, &PS2_port2_mouse_counter);
+}
+void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_counter) {
+	// volatile int *PS2_data_ptr = (int *)0xFF200100;
+	int PS2_data = *PS2_data_ptr;
+	char byte0 = 0, byte1 = 0, byte2 = 0;
+	while (PS2_data & 0x8000) {
+		//printf("%d\n", PS2_data & 0x8000);
+		byte2 = byte1;
+		byte1 = byte0;
+		byte0 = PS2_data & 0x0FF;
+		PS2_data = *PS2_data_ptr;
 
-    //printf("%d\n", PS2_data);
-    if (!game_start) { //Start Game
-	  game_start = true;
-	  }
-      else if (byte0 == (char)0x1D) { // W
-      global_controller_inputs.up = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x1C) { // A
-      global_controller_inputs.left = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x1B) { // S
-      global_controller_inputs.down = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x23) { // D
-      global_controller_inputs.right = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x29) { // space
-      global_controller_inputs.jump = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x12) { // left shift
-      global_controller_inputs.sneak = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x24) { // E
-      if (!global_controller_inputs.inventory && (byte1 != (char)0x0F0))
-        global_controller_inputs.inventory_toggle =
-            !global_controller_inputs.inventory_toggle;
-      global_controller_inputs.inventory = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x76) { // escape
-      if (!global_controller_inputs.pause && (byte1 != (char)0x0F0))
-        global_controller_inputs.pause_toggle =
-            !global_controller_inputs.pause_toggle;
-      global_controller_inputs.pause = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x2C) { // T
-      if (!global_controller_inputs.chat && (byte1 != (char)0x0F0))
-        global_controller_inputs.chat_toggle =
-            !global_controller_inputs.chat_toggle;
-      global_controller_inputs.chat = byte1 != (char)0x0F0;
-    } else if (byte0 == (char)0x4D) { //Placing blocks for now is P will work on mouse after
-      global_controller_inputs.place_block = byte1 != (char)0x0F0;
-    }
-    else if (byte0 == (char)0x44) { //Breaking Blocks for Now is O
-     global_controller_inputs.break_block = byte1 != (char)0x0F0;
-    }
+		//printf("%d\n", PS2_data);
+		if (*PS2_keyboard) { // keyboard inputs
+			if (!game_start) { //Start Game
+				game_start = true;
+			} else if (byte0 == (char)0x1D) { // W
+				global_controller_inputs.up = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x1C) { // A
+				global_controller_inputs.left = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x1B) { // S
+				global_controller_inputs.down = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x23) { // D
+				global_controller_inputs.right = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x29) { // space
+				global_controller_inputs.jump = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x12) { // left shift
+				global_controller_inputs.sneak = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x24) { // E
+				if (!global_controller_inputs.inventory && (byte1 != (char)0x0F0))
+					global_controller_inputs.inventory_toggle = !global_controller_inputs.inventory_toggle;
+				global_controller_inputs.inventory = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x76) { // escape
+				if (!global_controller_inputs.pause && (byte1 != (char)0x0F0))
+					global_controller_inputs.pause_toggle = !global_controller_inputs.pause_toggle;
+				global_controller_inputs.pause = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x2C) { // T
+				if (!global_controller_inputs.chat && (byte1 != (char)0x0F0))
+					global_controller_inputs.chat_toggle = !global_controller_inputs.chat_toggle;
+				global_controller_inputs.chat = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x4D) { //Placing blocks for now is P will work on mouse after
+				global_controller_inputs.place_block = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x44) { //Breaking Blocks for Now is O
+				global_controller_inputs.break_block = byte1 != (char)0x0F0;
+			}
+		} else { // mouse inputs
+			// printf("mouse!\n");
+			(*PS2_mouse_counter)++;
+			if (*PS2_mouse_counter == 3) {
+				// byte 2 [Y overflow, X overflow, Y sign, X sign, Always 1, Middle button, Right button, Left button]
+				global_controller_inputs.place_block = (byte2 & 0x01);
+				global_controller_inputs.break_block = (byte2 & 0x02);
+				// byte 1 [X movement]
+				global_controller_inputs.crosshair_x += (byte2 & 0x020) ? -byte1 : byte1;
+				// byte 0 [Y movement]
+				global_controller_inputs.crosshair_y += (byte2 & 0x010) ? -byte0 : byte0;
+				*PS2_mouse_counter = 0;
+			}
+		}
 
-    // mouse inserted; initialize sending of data
-    // else if ((byte1 == (char)0xAA) && (byte2 == (char)0x00)){
-    //   *PS2_data_ptr = 0xF4;   
-    //   global_controller_inputs.left = byte1 != (char)0x0F0;
-    // }
-
-  } 
+		// if ((byte1 == (char)0xAA) && (byte2 == (char)0x00)) { // mouse inserted; initialize sending of data
+		// 	*PS2_data_ptr = 0xF4;
+		// 	*PS2_keyboard = false;
+		// } else if ((byte1 == (char)0xAA) && (byte2 != (char)0x00)) { // keyboard inserted
+		// 	*PS2_data_ptr = 0xF4;
+		// 	*PS2_keyboard = true;
+		// }
+	}
 }
 
 
@@ -692,195 +746,189 @@ void PS2_poll() {
 // game logic
 void update_blocks() {
 
-  //Place block
-  if (global_controller_inputs.place_block){
-    global_controller_inputs.place_block = false;
+	//Place block
+	if (global_controller_inputs.place_block){
+		global_controller_inputs.place_block = false;
 
-    int x = global_player.x/8;
-    int y = global_player.y/8;
+		int x = global_player.x/8;
+		int y = global_player.y/8;
 
-
-    //Break Block
-    if(global_player.direction){
-     setBlockInChunk(&global_world.chunk_array[0], x+2, y, testBlock);
-    }
-	else{
-	setBlockInChunk(&global_world.chunk_array[0], x-1, y, testBlock);
+		//Break Block
+		if(global_player.direction){
+			setBlockInChunk(getChunkFromPosition(x+2), x+2, y, testBlock);
+		}
+		else{
+			setBlockInChunk(getChunkFromPosition(x+1), x-1, y, testBlock);
+		}
 	}
 
-  }
-  
-  if (global_controller_inputs.break_block){
-    global_controller_inputs.break_block = false;
+	if (global_controller_inputs.break_block) {
+		global_controller_inputs.break_block = false;
 
-    int x = global_player.x/8;
-    int y = global_player.y/8;
-    if(global_player.direction){
-     setBlockInChunk(&global_world.chunk_array[0], x+2, y, airBlock);
-    }
-	  else{
-	  setBlockInChunk(&global_world.chunk_array[0], x-1, y, airBlock);
-	  }
+		int x = global_player.x/8;
+		int y = global_player.y/8;
+		if(global_player.direction){
+			setBlockInChunk(getChunkFromPosition(x+2), x+2, y, airBlock);
+	} else{
+		setBlockInChunk(getChunkFromPosition(x+1), x-1, y, airBlock);
+	}
 
-  }
+	}
 
 }
 
 
 void update_entities() {
-   global_player.velocity_x = 0;
-	
-  int x_loc = global_player.x;
-  int y_loc = global_player.y;
-
-
-  struct Chunk *current_chunk = getChunkFromPosition(x_loc>>3);
-  struct Block *player_spot = getBlockFromChunk(current_chunk, (x_loc>>3), y_loc>>3);
-  struct Block *player_spot_top = getBlockFromChunk(current_chunk, (x_loc>>3), (y_loc>>3)+1);
-  struct Block *player_right = getBlockFromChunk(current_chunk, (x_loc>>3) + 1, y_loc>>3);
-  //struct Block *player_left = getBlockFromChunk(current_chunk, (x_loc>>3) - 1 , y_loc>>3);
-  struct Block *player_top_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , (y_loc>>3)+1);
-  //struct Block *player_top_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , (y_loc>>3)+1);	
-  struct Block *player_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 2 );
-  struct Block *player_bottom = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) - 1);		
-  struct Block *player_bottom_right = getBlockFromChunk(current_chunk, (x_loc>>3) +1 , (y_loc>>3) - 1);	
-  struct Block *player_double_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 3);			
-	
-  if (global_controller_inputs.left && (*player_spot).block_type == 0 && (*player_spot_top).block_type == 0){
-  	global_player.velocity_x -= 2;
-	global_player.direction = false;
-  }	 
-  else if(global_controller_inputs.left){
 	global_player.velocity_x = 0;
-	global_player.direction = false;  
-  }	  
-  if (global_controller_inputs.right  && (*player_right).block_type == 0 && (*player_top_right).block_type == 0){
-  	global_player.velocity_x += 2;
-	global_player.direction = true; 
-  }	  
-  else if(global_controller_inputs.right){
-	global_player.velocity_x = 0;
-	global_player.direction = true; 
-  }	  
-  if ( (global_controller_inputs.up || global_controller_inputs.jump)  && (*player_top).block_type == 0 
+
+	int x_loc = global_player.x;
+	int y_loc = global_player.y;
+
+	struct Chunk *current_chunk = getChunkFromPosition(x_loc>>3);
+	struct Block *player_spot = getBlockFromChunk(current_chunk, (x_loc>>3), y_loc>>3);
+	struct Block *player_spot_top = getBlockFromChunk(current_chunk, (x_loc>>3), (y_loc>>3)+1);
+	struct Block *player_right = getBlockFromChunk(current_chunk, (x_loc>>3) + 1, y_loc>>3);
+	//struct Block *player_left = getBlockFromChunk(current_chunk, (x_loc>>3) - 1 , y_loc>>3);
+	struct Block *player_top_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , (y_loc>>3)+1);
+	//struct Block *player_top_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , (y_loc>>3)+1);
+	struct Block *player_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 2 );
+	struct Block *player_bottom = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc-2)>>3);
+	struct Block *player_bottom_right = getBlockFromChunk(current_chunk, (x_loc>>3) +1 , (y_loc-2)>>3);
+	struct Block *player_double_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 3);
+
+	// if collision set velocity y to 0
+	// else add gravity
+	if (global_player.velocity_y > -10 && ((*player_bottom).block_type == 0 && (*player_bottom_right).block_type == 0 ))
+		global_player.velocity_y -= 1;
+	else if((*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0){
+		global_player.velocity_y = 0;
+		global_player.y = ((global_player.y >> 3) << 3);
+	}
+
+	if (global_controller_inputs.left && (*player_spot).block_type == 0 && (*player_spot_top).block_type == 0){
+		global_player.velocity_x -= 2;
+		global_player.direction = false;
+	}
+	else if(global_controller_inputs.left){
+		global_player.velocity_x = 0;
+		global_player.direction = false;
+	}
+	if (global_controller_inputs.right  && (*player_right).block_type == 0 && (*player_top_right).block_type == 0){
+		global_player.velocity_x += 2;
+		global_player.direction = true;
+	}
+	else if(global_controller_inputs.right){
+		global_player.velocity_x = 0;
+		global_player.direction = true;
+	}
+	if ( (global_controller_inputs.up || global_controller_inputs.jump)  && (*player_top).block_type == 0
 	  && ( (*player_double_top).block_type == 0 && (*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0) ){
-  	global_player.velocity_y = 8;
-	global_player.y += 16;
-  }	
-  else if((global_controller_inputs.up || global_controller_inputs.jump) )
-	global_player.velocity_y = 0;	
-	
-  global_player.x += global_player.velocity_x;
-	
-  // if collision set velocity y to 0
-  // else add gravity
-  if (global_player.velocity_y > -10 && ((*player_bottom).block_type == 0 && (*player_bottom_right).block_type == 0 ))
-  	global_player.velocity_y -= 1;
-  else if((*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0){	
-	 global_player.velocity_y = 0;
-	 global_player.y = ((global_player.y >> 3) << 3);
-  }	 
-	
-  global_player.y += global_player.velocity_y;
-	
-  //World Boundaries	
-  if (global_player.x < 0)
-    global_player.x = 0;
-  else if (global_player.x >= chunk_width * 64)
-    global_player.x = chunk_width * 64 - 1;
+		global_player.velocity_y = 8;
+		// global_player.y += 16;
+	}
+	else if((global_controller_inputs.up || global_controller_inputs.jump) )
+		global_player.velocity_y = 0;
 
-  // global camera
-  global_camera.x = global_player.x - screen_width / 2;
-  if (global_camera.x < 0)
-  	global_camera.x = 0;
-  else if (global_camera.x >= chunk_width * 64 * 8 - screen_width)
-   	global_camera.x = chunk_width * 64 - screen_width - 1;
-  global_camera.y = global_player.y - screen_height / 2;
-  if (global_camera.y < 0)
-  	global_camera.y = 0;
-  else if (global_camera.y >= 128 * 8 - screen_width)
-   	global_camera.y = 128 * 8 - screen_width - 1;
+	global_player.x += global_player.velocity_x;
+
+	global_player.y += global_player.velocity_y;
+
+	//World Boundaries
+	if (global_player.x < 0)
+		global_player.x = 0;
+	else if (global_player.x >= chunk_width * 64)
+		global_player.x = chunk_width * 64 - 1;
+
+	// global camera
+	global_camera.x = global_player.x - screen_width / 2;
+	if (global_camera.x < 0)
+		global_camera.x = 0;
+	else if (global_camera.x >= chunk_width * 64 * 8 - screen_width)
+		global_camera.x = chunk_width * 64 - screen_width - 1;
+	global_camera.y = global_player.y - screen_height / 2;
+	if (global_camera.y < 0)
+		global_camera.y = 0;
+	else if (global_camera.y >= 128 * 8 - screen_width)
+		global_camera.y = 128 * 8 - screen_width - 1;
 }
 
 // general rendering
 
 void clear_screen() {
-  for (int y = 0; y < screen_height; y++)
-    for (int x = 0; x < screen_width; x++)
-      plot_pixel(x, y, obsidian_black);
+	for (int y = 0; y < screen_height; y++)
+		for (int x = 0; x < screen_width; x++)
+			plot_pixel(x, y, obsidian_black);
 }
 
 void draw_line(int x0, int y0, int x1, int y1, short int line_color) {
-  bool steep = abs(y1 - y0) > abs(x1 - x0);
-  if (steep) {
-    swap(&x0, &y0);
-    swap(&x1, &y1);
-  }
-  if (x0 > x1) {
-    swap(&x0, &x1);
-    swap(&y0, &y1);
-  }
+	bool steep = abs(y1 - y0) > abs(x1 - x0);
+	if (steep) {
+		swap(&x0, &y0);
+		swap(&x1, &y1);
+	}
+	if (x0 > x1) {
+		swap(&x0, &x1);
+		swap(&y0, &y1);
+	}
 
-  int deltax = x1 - x0;
-  int deltay = abs(y1 - y0);
-  int error = -(deltax / 2);
-  int y = y0;
-  int y_step;
+	int deltax = x1 - x0;
+	int deltay = abs(y1 - y0);
+	int error = -(deltax / 2);
+	int y = y0;
+	int y_step;
 
-  if (y0 < y1)
-    y_step = 1;
-  else
-    y_step = -1;
+	if (y0 < y1)
+		y_step = 1;
+	else
+		y_step = -1;
 
-  for (int x = x0; x <= x1; x++) {
-    if (steep)
-      plot_pixel(y, x, line_color);
-    else
-      plot_pixel(x, y, line_color);
-    error += deltay;
-    if (error > 0) {
-      y += y_step;
-      error -= deltax;
-    }
-  }
+	for (int x = x0; x <= x1; x++) {
+		if (steep)
+			plot_pixel(y, x, line_color);
+		else
+			plot_pixel(x, y, line_color);
+		error += deltay;
+		if (error > 0) {
+			y += y_step;
+			error -= deltax;
+		}
+	}
 }
 
 void swap(int *a, int *b) {
-  int c = *a;
-  *a = *b;
-  *b = c;
+	int c = *a;
+	*a = *b;
+	*b = c;
 }
 
 void plot_pixel(int x, int y, short int line_color) {
-  short int *one_pixel_address;
+	short int *one_pixel_address;
 
-  one_pixel_address = (short *)(pixel_buffer_start +
-                                ((screen_height - 1 - y) << 10) + ((x) << 1));
+	one_pixel_address = (short *)(pixel_buffer_start + ((screen_height - 1 - y) << 10) + ((x) << 1));
 
-  *one_pixel_address = line_color;
+	*one_pixel_address = line_color;
 }
 
 void plot_pixel_vertical(int x, int y, short int line_color)
 {
     short int *one_pixel_address;
 
-	one_pixel_address = (short *)(pixel_buffer_start
-								  + (y << 10) + (x << 1));
+	one_pixel_address = (short *)(pixel_buffer_start + (y << 10) + (x << 1));
 
 	*one_pixel_address = line_color;
 }
 
 
 void wait_for_vsync() {
-  volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
-  *pixel_ctrl_ptr = 1; // swap buffers
-  int status = *(pixel_ctrl_ptr + 3);
-  while ((status & 0x01))
-    status = *(pixel_ctrl_ptr + 3);
+	volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
+	*pixel_ctrl_ptr = 1; // swap buffers
+	int status = *(pixel_ctrl_ptr + 3);
+	while ((status & 0x01))
+		status = *(pixel_ctrl_ptr + 3);
 }
 
 void wait_for_vsync_and_swap() {
-  volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
-  wait_for_vsync();
-  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+	volatile int *pixel_ctrl_ptr = (int *)0xFF203020;
+	wait_for_vsync();
+	pixel_buffer_start = *(pixel_ctrl_ptr + 1);
 }
