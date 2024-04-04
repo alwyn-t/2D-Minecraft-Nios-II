@@ -406,6 +406,7 @@ struct controller_inputs {
   bool up;
   bool down;
   bool jump;
+  bool sprint;
   bool sneak;
   bool inventory;
   bool inventory_toggle;
@@ -419,7 +420,7 @@ struct controller_inputs {
   int crosshair_y;
 };
 struct controller_inputs global_controller_inputs = {
-    false, false, false, false, false, false, false, false, false, false, false, false, false, false, screen_width >> 1,  screen_height >> 1};
+    false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, screen_width >> 1,  screen_height >> 1};
 void PS2_port1_poll();
 void PS2_port2_poll();
 void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_counter);
@@ -698,6 +699,8 @@ void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_cou
 				global_controller_inputs.jump = byte1 != (char)0x0F0;
 			} else if (byte0 == (char)0x12) { // left shift
 				global_controller_inputs.sneak = byte1 != (char)0x0F0;
+			} else if (byte0 == (char)0x14) { // left shift
+				global_controller_inputs.sprint = byte1 != (char)0x0F0;
 			} else if (byte0 == (char)0x24) { // E
 				if (!global_controller_inputs.inventory && (byte1 != (char)0x0F0))
 					global_controller_inputs.inventory_toggle = !global_controller_inputs.inventory_toggle;
@@ -725,15 +728,16 @@ void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_cou
 				// byte 1 [X movement]
 				global_controller_inputs.crosshair_x += (byte2 & 0x020) ? -byte1 : byte1;
 				// byte 0 [Y movement]
-				global_controller_inputs.crosshair_y += (byte2 & 0x010) ? -byte0 : byte0;
+				global_controller_inputs.crosshair_y += (byte2 & 0x010) ? byte0 : -byte0;
 				*PS2_mouse_counter = 0;
 			}
 		}
 
-		// if ((byte1 == (char)0xAA) && (byte2 == (char)0x00)) { // mouse inserted; initialize sending of data
-		// 	*PS2_data_ptr = 0xF4;
-		// 	*PS2_keyboard = false;
-		// } else if ((byte1 == (char)0xAA) && (byte2 != (char)0x00)) { // keyboard inserted
+		if ((byte1 == (char)0xAA) && (byte2 == (char)0x00)) { // mouse inserted; initialize sending of data
+			*PS2_data_ptr = 0xF4;
+			*PS2_keyboard = false;
+		}
+	 	// else if ((byte1 == (char)0xAA) && (byte2 != (char)0x00)) { // keyboard inserted
 		// 	*PS2_data_ptr = 0xF4;
 		// 	*PS2_keyboard = true;
 		// }
@@ -785,49 +789,53 @@ void update_entities() {
 	int y_loc = global_player.y;
 
 	struct Chunk *current_chunk = getChunkFromPosition(x_loc>>3);
-	struct Block *player_spot = getBlockFromChunk(current_chunk, (x_loc>>3), y_loc>>3);
-	struct Block *player_spot_top = getBlockFromChunk(current_chunk, (x_loc>>3), (y_loc>>3)+1);
-	struct Block *player_right = getBlockFromChunk(current_chunk, (x_loc>>3) + 1, y_loc>>3);
-	//struct Block *player_left = getBlockFromChunk(current_chunk, (x_loc>>3) - 1 , y_loc>>3);
-	struct Block *player_top_right = getBlockFromChunk(current_chunk, (x_loc>>3)+1 , (y_loc>>3)+1);
-	//struct Block *player_top_left = getBlockFromChunk(current_chunk, (x_loc>>3)-1 , (y_loc>>3)+1);
-	struct Block *player_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 2 );
-	struct Block *player_bottom = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc-2)>>3);
-	struct Block *player_bottom_right = getBlockFromChunk(current_chunk, (x_loc>>3) +1 , (y_loc-2)>>3);
-	struct Block *player_double_top = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc>>3) + 3);
 
-	// if collision set velocity y to 0
-	// else add gravity
-	if (global_player.velocity_y > -10 && ((*player_bottom).block_type == 0 && (*player_bottom_right).block_type == 0 ))
+	bool on_ground = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc-2)>>3)->block_type != air || getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (y_loc-2)>>3)->block_type != air;
+
+	if (global_player.velocity_y > -7)
 		global_player.velocity_y -= 1;
-	else if((*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0){
-		global_player.velocity_y = 0;
-		global_player.y = ((global_player.y >> 3) << 3);
+	if (global_controller_inputs.left) {
+		global_player.velocity_x -= (global_controller_inputs.sprint) ? 4 : ((global_controller_inputs.sneak) ? 1 : 2);
+		global_player.direction = false;
 	}
+	if (global_controller_inputs.right) {
+		global_player.velocity_x += (global_controller_inputs.sprint) ? 4 : ((global_controller_inputs.sneak) ? 1 : 2);
+		global_player.direction = true;
+	}
+	if (global_controller_inputs.jump && on_ground)
+		global_player.velocity_y = 5;
 
-	if (global_controller_inputs.left && (*player_spot).block_type == 0 && (*player_spot_top).block_type == 0){
-		global_player.velocity_x -= 2;
-		global_player.direction = false;
+	int n_x_pos = x_loc + global_player.velocity_x;
+	int n_y_pos = y_loc + global_player.velocity_y;
+	bool next_position_valid = true;
+	if (global_player.velocity_x > 0) {
+		if (getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 15)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 8)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 0)>>3)->block_type != air) {
+				global_player.velocity_x = 0;
+				global_player.x = (((n_x_pos+7)>>3)<<3) - 8;
+			}
+	} else if (global_player.velocity_x < 0) {
+		if (getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 15)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 8)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 0)>>3)->block_type != air) {
+				global_player.velocity_x = 0;
+				global_player.x = ((n_x_pos>>3)<<3) + 8;
+			}
 	}
-	else if(global_controller_inputs.left){
-		global_player.velocity_x = 0;
-		global_player.direction = false;
+	if (global_player.velocity_y > 0) {
+		if (getBlockFromChunk(current_chunk, (x_loc  )>>3 , (n_y_pos + 15)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (n_y_pos + 15)>>3)->block_type != air) {
+				global_player.velocity_y = 0;
+				global_player.y = (((n_y_pos + 15)>>3)<<3) - 16;
+			}
+	} else if (global_player.velocity_y < 0) {
+		if (getBlockFromChunk(current_chunk, (x_loc  )>>3 , (n_y_pos)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (n_y_pos)>>3)->block_type != air) {
+				global_player.velocity_y = 0;
+				global_player.y = ((n_y_pos>>3)<<3) + 8;
+			}
 	}
-	if (global_controller_inputs.right  && (*player_right).block_type == 0 && (*player_top_right).block_type == 0){
-		global_player.velocity_x += 2;
-		global_player.direction = true;
-	}
-	else if(global_controller_inputs.right){
-		global_player.velocity_x = 0;
-		global_player.direction = true;
-	}
-	if ( (global_controller_inputs.up || global_controller_inputs.jump)  && (*player_top).block_type == 0
-	  && ( (*player_double_top).block_type == 0 && (*player_bottom).block_type != 0 || (*player_bottom_right).block_type != 0) ){
-		global_player.velocity_y = 8;
-		// global_player.y += 16;
-	}
-	else if((global_controller_inputs.up || global_controller_inputs.jump) )
-		global_player.velocity_y = 0;
 
 	global_player.x += global_player.velocity_x;
 
