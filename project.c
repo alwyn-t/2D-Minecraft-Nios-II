@@ -45,6 +45,68 @@ short int dirt_block_texture[64] = {
     0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2,
     0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2,
     0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2, 0x71C2};
+
+short int stone_block_texture[64] = {
+    0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
+    0x0000, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0x0000,
+    0x0000, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0x0000,
+    0x0000, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0x0000,
+    0x0000, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0x0000,
+    0x0000, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0x0000,
+    0x0000, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0xAD98, 0x0000,
+    0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000};
+
+short int wood_block_texture[64] = {
+	16805,16837,16805,18917,16805,16837,16805,18885,
+	16805,16805,16805,16837,16837,16805,16805,18885,
+	16837,16837,16837,16805,18917,18885,16837,18885,
+	16805,16837,18917,16837,18917,18885,16837,18885,
+	16837,18917,18917,16837,16837,16837,18885,16805,
+	16837,18917,16837,16805,18917,16805,18917,16805,
+	18917,16837,18917,16837,18885,16805,16837,18885,
+	18885,16837,18885,16837,16805,16837,16805,18917};
+
+short int diamond_block_texture[64] = {
+	55262,65503,40924,55262,40924,26524,55262,5624,
+	65503,28605,40924,28605,20316,20316,28605,5624,
+	40924,40924,28605,20316,26524,40924,20316,3511,
+	55262,28605,28605,26524,28605,20316,16124,3511,
+	40924,28605,26524,28605,26524,26524,28605,5624,
+	20316,26524,40924,20316,26524,40924,26524,3511,
+	16124,28605,20316,16124,26524,26524,20316,5624,
+	5624,5624,3511,3511,5624,3511,5624,3511,};
+
+short int leaf_block_texture[64] = {
+    0x04A0, 0x04A0, 0x04A0, 0x0000, 0x04A0, 0x04A0, 0x0000, 0x04A0,
+    0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x0000, 0x04A0, 0x04A0,
+    0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x0000, 0x04A0, 0x04A0, 0x04A0,
+    0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x0000, 0x04A0,
+    0x0000, 0x0000, 0x0000, 0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x04A0,
+    0x04A0, 0x04A0, 0x04A0, 0x0000, 0x04A0, 0x0000, 0x04A0, 0x04A0,
+    0x04A0, 0x0000, 0x0000, 0x04A0, 0x0000, 0x04A0, 0x04A0, 0x04A0,
+    0x04A0, 0x04A0, 0x0000, 0x04A0, 0x04A0, 0x04A0, 0x04A0, 0x0000};
+
+short int ore_block_texture[64] = {
+	31695,31760,33873,35888,33775,33840,31760,31695,
+	31727,31760,29713,33906,31923,31727,34004,31728,
+	33808,33840,40212,36117,31760,42391,33840,31662,
+	33873,38099,38231,29973,33841,34102,33873,31727,
+	36019,31826,29614,35986,38555,31923,33775,35921,
+	31695,31727,31826,33840,33970,38262,34101,31727,
+	31727,33938,29810,31662,40472,36410,30006,33840,
+	31695,31727,31760,31727,31760,31792,31662,31727};
+
+short int obsidian_block_texture[64] = {
+	0,2082,4103,4132,6308,8296,8391,6309,
+	6245,8390,6247,10345,8295,12331,10344,4101,
+	10345,14413,8264,12331,18479,8294,4100,8201,
+	10282,8327,10408,14446,4134,8263,8295,4164,
+	4133,10377,16464,14476,6215,10281,6245,8265,
+	4166,12332,14380,4134,6244,6277,6215,8234,
+	6341,6278,6152,2115,10408,12365,4135,4164,
+	2146,10281,4132,4195,8232,4101,4102,33 };
+
+
 short int pig_entity_texture[64] = {
     0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,
     0x0000, 0x0000, 0x0000, 0x0000, 0xFD54, 0xFCD3, 0xFD54, 0xFD54,
@@ -342,6 +404,9 @@ enum BlockType {
   stone,
   oak_wood_log,
   leaves,
+  diamond,
+  ore,
+  obsidian,	
   water,
   lava
 };
@@ -355,6 +420,14 @@ struct Block {
 
 struct Block testBlock = {stone, true, 0};
 struct Block airBlock = {air, true, 0};
+struct Block grassBlock = {grass_block, true, 0};
+struct Block dirtBlock = {dirt, true, 0};
+struct Block stoneBlock = {stone, true, 0};
+struct Block woodBlock = {oak_wood_log, true, 0};
+struct Block leafBlock = {leaves, true, 0};
+struct Block obsidianBlock = {obsidian, true, 0};
+struct Block diamondBlock = {diamond, true, 0};
+struct Block oreBlock = {ore, true, 0};
 
 enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow };
 struct Entity {
@@ -406,9 +479,13 @@ void draw_entity(struct Entity *entity);
 void draw_entities();
 void draw_block_overlay(struct Block *, int x_8, int y_8);
 void draw_block_overlays();
+void draw_hollow_box(int x_input, int y_input, int colour);
 void draw_map();
 void draw_8x8_transparent(short int *, int x, int y);
 void draw_crosshair();
+void draw_bar();
+void draw_block_lock(struct Block *block, int x, int y); 
+int highlight_slot = 0;
 
 // IO
 int switch_poll();
@@ -495,6 +572,7 @@ int main(void) {
 		draw_blocks();
 		draw_entities();
 		draw_crosshair();
+		draw_bar();
 
 		//setBlockInChunk(&global_world.chunk_array[0], 30, 32, testBlock);
 		//setBlockInChunk(&global_world.chunk_array[0], 31, 32, testBlock);
@@ -583,10 +661,29 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 		case air:
 			texture_array = air_block_texture;
 			break;
+		case stone:
+			texture_array = stone_block_texture;
+			break;
+		case leaves:
+			texture_array = leaf_block_texture;
+			break;
+		case oak_wood_log:
+			texture_array = wood_block_texture;
+			break;
+		case obsidian:
+			texture_array = obsidian_block_texture;
+			break;			
+		case diamond:
+			texture_array = diamond_block_texture;
+			break;
+		case ore:
+			texture_array = ore_block_texture;
+			break;
 		default:
 			texture_array = dirt_block_texture;
 			break;
 	}
+	
 	// screen refers to screen position, local refers to pixel within the block
 	int block_screen_x, block_screen_y, block_local_x, block_local_y;
 	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
@@ -602,6 +699,54 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 		}
 	}
 }
+	
+	
+void draw_block_lock(struct Block *block, int x, int y) {
+	short int *texture_array;
+	switch (block->block_type) {
+		case grass_block:
+			texture_array = grass_block_texture;
+			break;
+		case dirt:
+			texture_array = dirt_block_texture;
+			break;
+		case air:
+			texture_array = air_block_texture;
+			break;
+		case stone:
+			texture_array = stone_block_texture;
+			break;
+		case leaves:
+			texture_array = leaf_block_texture;
+			break;
+		case oak_wood_log:
+			texture_array = wood_block_texture;
+			break;
+		case obsidian:
+			texture_array = obsidian_block_texture;
+			break;			
+		case diamond:
+			texture_array = diamond_block_texture;
+			break;
+		case ore:
+			texture_array = ore_block_texture;
+			break;
+		default:
+			texture_array = dirt_block_texture;
+			break;
+	}
+	// screen refers to screen position, local refers to pixel within the block
+	int block_local_x, block_local_y;
+	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
+			plot_pixel(x+block_local_x, y+block_local_y,
+			texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
+		}
+	}
+}
+	
+	
+
 void draw_blocks() {
 	int camera_x_8 = global_camera.x >> 3;
 	int camera_y_8 = global_camera.y >> 3;
@@ -663,6 +808,26 @@ void draw_crosshair() {
 		plot_pixel(global_controller_inputs.crosshair_x + 1, global_controller_inputs.crosshair_y + y, cold_steel_white);
 		plot_pixel(global_controller_inputs.crosshair_x + 0, global_controller_inputs.crosshair_y + y, cold_steel_white);
 	}
+}
+
+void draw_bar(){
+	for(int i = 0; i < 8; i++){
+		if(i != highlight_slot)
+			draw_hollow_box(24*i+64,40,0xDEDB);
+		else
+			draw_hollow_box(24*i+64,40,0xFFD0);
+	}
+	
+    draw_block_lock(&grassBlock, 72, 48);	
+	draw_block_lock(&dirtBlock, 96, 48);	
+	draw_block_lock(&stoneBlock,120, 48);	
+	draw_block_lock(&woodBlock,144, 48);
+	draw_block_lock(&leafBlock, 168, 48);
+	draw_block_lock(&obsidianBlock,192, 48);
+	draw_block_lock(&oreBlock,216, 48);
+	draw_block_lock(&diamondBlock,240 , 48);
+	
+	
 }
 
 // ================== IO ================ //
@@ -735,7 +900,31 @@ void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_cou
 				global_controller_inputs.place_block = byte1 != (char)0x0F0;
 			} else if (byte0 == (char)0x44) { //Breaking Blocks for Now is O
 				global_controller_inputs.break_block = byte1 != (char)0x0F0;
+			}else if (byte0 == (char)0x16) { // block 1
+				highlight_slot = 0;
 			}
+			else if (byte0 == (char)0x1E) { // block 2
+				highlight_slot = 1;
+			}
+			else if (byte0 == (char)0x26) { // block 3
+				highlight_slot = 2;
+			}
+			else if (byte0 == (char)0x25) { // block 4
+				highlight_slot = 3;
+			}			
+			else if (byte0 == (char)0x2E) { // block 5
+				highlight_slot = 4;
+			}
+			else if (byte0 == (char)0x36) { // block 6
+				highlight_slot = 5;
+			}
+			else if (byte0 == (char)0x3D) { // block 6
+				highlight_slot = 6;
+			}
+			else if (byte0 == (char)0x3E) { // block 7
+				highlight_slot = 7;
+			}
+				
 		} else { // mouse inputs
 			// printf("mouse!\n");
 			(*PS2_mouse_counter)++;
@@ -775,12 +964,30 @@ void update_blocks() {
 
 		int x = global_player.x/8;
 		int y = global_player.y/8;
-
+		
+		struct Block place_block = testBlock;
+		if(highlight_slot == 0)
+			place_block = grassBlock;
+		if(highlight_slot == 1)
+			place_block = dirtBlock;
+		if(highlight_slot == 2)
+			place_block = stoneBlock;
+		if(highlight_slot == 3)
+			place_block = woodBlock;
+		if(highlight_slot == 4)
+			place_block = leafBlock;
+		if(highlight_slot == 5)
+			place_block = obsidianBlock;
+		if(highlight_slot == 6)
+			place_block = oreBlock;
+		if(highlight_slot == 7)
+			place_block = diamondBlock;
+		
 		if(global_player.direction){
-			setBlockInChunk(getChunkFromPosition(x+2), x+2, y, testBlock);
+			setBlockInChunk(getChunkFromPosition(x+2), x+2, y, place_block);
 		}
 		else{
-			setBlockInChunk(getChunkFromPosition(x+1), x-1, y, testBlock);
+			setBlockInChunk(getChunkFromPosition(x+1), x-1, y, place_block);
 		}
 	}
 	
@@ -942,6 +1149,20 @@ void swap(int *a, int *b) {
 	int c = *a;
 	*a = *b;
 	*b = c;
+}
+
+
+void draw_hollow_box(int x_input, int y_input, int colour)
+{
+    for (int x = 0; x < 24; x++){
+        for (int y = 0; y < 24; y++){
+			if(x==0 || x== 23 || y == 0 || y == 23)
+        		plot_pixel (x_input + x, y_input + y, colour);
+			else
+				plot_pixel (x_input + x, y_input + y, 44440);
+		}	
+	}
+	
 }
 
 void plot_pixel(int x, int y, short int line_color) {
