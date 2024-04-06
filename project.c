@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 int pixel_buffer_start;      // global variable
 short int Buffer1[240][512]; // 240 rows, 512 (320 + padding) columns
@@ -486,6 +487,7 @@ void draw_hollow_box(int x_input, int y_input, int colour);
 void draw_map();
 void draw_8x8_transparent(short int const *, int x, int y);
 void draw_crosshair();
+void draw_block_select_overlay();
 void draw_bar();
 void draw_block_lock(struct Block *block, int x, int y);
 int highlight_slot = 0;
@@ -575,6 +577,7 @@ int main(void) {
 		//global_controller_inputs.pause_toggle);
 		draw_blocks();
 		draw_entities();
+		draw_block_select_overlay();
 		draw_bar();
 		draw_crosshair();
 
@@ -616,17 +619,8 @@ void load_menu() {
 
 // game generation
 void generate_map() {
-	// erase old map
-	struct Block temp_air_block = {air, false, 0};
-	for (int i = 0; i < chunk_width; i++) {
-		struct Chunk *temp_chunk = &global_world.chunk_array[i];
-		for (int x_8 = 0; x_8 < 64; x_8++) {
-			for (int y_8 = 0; y_8 < 128; y_8++) {
-				setBlockInChunk(temp_chunk, x_8, y_8, temp_air_block);
-			}
-		}
-	}
-	struct Entity temp_player = {10 * 8, 32 * 8, 0, 0, player, 0, true};
+	// generate entities
+	struct Entity temp_player = {chunk_width * 64 * 8 / 2, 0, 0, 0, player, 0, true};
 	global_player = temp_player;
 	struct Entity temp_blank_entity = {0, 0, 0, 0, unassigned_entity, 0};
 	for (int i = 0; i < mob_cap; i++) {
@@ -635,16 +629,64 @@ void generate_map() {
 	}
 
 	// generate new map
-	struct Block temp_dirt_block = {dirt, false, 0};
-	struct Block temp_grass_block = {grass_block, false, 0};
-	for (int x_8 = 0; x_8 < (chunk_width << 6); x_8++) {
-		struct Chunk *temp_chunk = getChunkFromPosition(x_8);
-		for (int y_8 = 0; y_8 < 32; y_8++) {
-			setBlockInChunk(temp_chunk, x_8, y_8, (y_8 != 31) ? temp_dirt_block : temp_grass_block);
+	#define tree_density 3
+	int tree_locations[chunk_width*tree_density*2]; // on average, there will be 3 trees in each chunk
+	for (int i = 0; i < chunk_width*tree_density; i++) {
+		int x = 64.0/tree_density*i + 12*sin((double)i/4)*pow(cos(2*(double)i/7), 2); // spaced
+		if (x < 0)
+			x = 0;
+		else if (x > chunk_width*64 - 1)
+			x = chunk_width*64 - 1;
+		tree_locations[i*2] = x;
+	}
+	int tree_i = 0;
+	struct Chunk *temp_chunk = getChunkFromPosition(0);
+	for (int x_8 = 0; x_8 < chunk_width * 64; x_8++) {
+		double x = (double)x_8;
+		double y_h = 3 * (pow(sin(x/10),2)*sin(x/15+2)/1.5 + cos(x/35)*sin(x/20));
+		double y_m = 4 * (pow(sin(2*x/25),3)*cos(x/15) + pow(sin(6*x/35), 2)*sin(7*x/15)/2);
+		double w_h = pow(sin(x/30), 4);
+		double w_m = 1 - w_h;
+		int y = (int)(y_h * w_h + y_m * w_m) + (128 >> 2);
+		if (x_8 == global_player.x >> 3) {
+			if (tree_locations[tree_i] != global_player.x >> 3)
+				global_player.y = (y+1) * 8;
+			else
+				global_player.x += 8;
+		}
+		if (tree_locations[tree_i] == x_8) {
+			tree_locations[tree_i + 1] = y + 1;
+			tree_i+=2;
+		}
+		if (!(x_8 % 64))
+			temp_chunk = getChunkFromPosition(x_8);
+		for (int y_8 = 0; y_8 < 128; y_8++) {
+			setBlockInChunk(temp_chunk, x_8, y_8, (y_8 < y) ? dirtBlock : ((y_8 == y) ? grassBlock : airBlock));
 		}
 	}
+	for (int i = 0; i < chunk_width*tree_density; i++) {
+		printf("x: %i, y: %i\n", tree_locations[i*2], tree_locations[i*2+1]);
+		int tree_base_x = tree_locations[i*2];
+		int tree_base_y = tree_locations[i*2+1];
+		temp_chunk = getChunkFromPosition(tree_base_x);
+		for (int y_local = 0; y_local < 4; y_local++) {
+			setBlockInChunk(temp_chunk, tree_base_x, tree_base_y + y_local, woodBlock);
+		}
+		for (int x_local = -2; x_local < 3; x_local++) {
+			temp_chunk = getChunkFromPosition(tree_base_x + x_local);
+			for (int y_local = 2; y_local < 5; y_local++) {
+				if (y_local == 4)
+					if (x_local == -2 || x_local == 2)
+						continue;
+				if (getBlockFromChunk(temp_chunk, tree_base_x + x_local, tree_base_y + y_local)->block_type == air) {
+					setBlockInChunk(temp_chunk, tree_base_x + x_local, tree_base_y + y_local, leafBlock);
+				}
+			}
+		}
+	}
+
 	//setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
-	setBlockInChunk(getChunkFromPosition(50), 50, 32, temp_dirt_block);
+	// setBlockInChunk(getChunkFromPosition(50), 50, 32, temp_dirt_block);
 }
 void load_map() {}
 void save_map() {}
@@ -703,8 +745,6 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 		}
 	}
 }
-
-
 void draw_block_lock(struct Block *block, int x, int y) {
 	short int const *texture_array;
 	switch (block->block_type) {
@@ -748,9 +788,6 @@ void draw_block_lock(struct Block *block, int x, int y) {
 		}
 	}
 }
-
-
-
 void draw_blocks() {
 	int camera_x_8 = global_camera.x >> 3;
 	int camera_y_8 = global_camera.y >> 3;
@@ -811,6 +848,23 @@ void draw_crosshair() {
 	for (int y = -3; y <= 4; y++) {
 		plot_pixel(global_controller_inputs.crosshair_x + 1, global_controller_inputs.crosshair_y + y, cold_steel_white);
 		plot_pixel(global_controller_inputs.crosshair_x + 0, global_controller_inputs.crosshair_y + y, cold_steel_white);
+	}
+}
+
+void draw_block_select_overlay() {
+	int x_8 = (global_camera.x + global_controller_inputs.crosshair_x) >> 3;
+	int y_8 = (global_camera.y + global_controller_inputs.crosshair_y) >> 3;
+	int x = (x_8 << 3) - global_camera.x;
+	int y = (y_8 << 3) - global_camera.y;
+	if (getBlockFromChunk(getChunkFromPosition(x_8), x_8, y_8)->block_type != air) {
+		for (int x_local = 0; x_local < 8; x_local++) {
+			plot_pixel(x + x_local, y    , obsidian_black);
+			plot_pixel(x + x_local, y + 7, obsidian_black);
+		}
+		for (int y_local = 0; y_local < 8; y_local++) {
+			plot_pixel(x    , y + y_local, obsidian_black);
+			plot_pixel(x + 7, y + y_local, obsidian_black);
+		}
 	}
 }
 
@@ -1278,28 +1332,28 @@ void update_entities() {
 		global_player.direction = true;
 	}
 	if (global_controller_inputs.jump && on_ground)
-		global_player.velocity_y = 5;
+		global_player.velocity_y = 4;
 
 	int n_x_pos = x_loc + global_player.velocity_x;
 	int n_y_pos = y_loc + global_player.velocity_y;
 	if (global_player.velocity_x > 0) {
-		if (getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 15)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 8)>>3)->block_type != air ||
+		if (getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 14)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 7)>>3)->block_type != air ||
 			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 0)>>3)->block_type != air) {
 				global_player.velocity_x = 0;
 				global_player.x = (((n_x_pos+7)>>3)<<3) - 8;
 			}
 	} else if (global_player.velocity_x < 0) {
-		if (getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 15)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 8)>>3)->block_type != air ||
+		if (getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 14)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 7)>>3)->block_type != air ||
 			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 0)>>3)->block_type != air) {
 				global_player.velocity_x = 0;
 				global_player.x = ((n_x_pos>>3)<<3) + 8;
 			}
 	}
 	if (global_player.velocity_y > 0) {
-		if (getBlockFromChunk(current_chunk, (x_loc  )>>3 , (n_y_pos + 15)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (n_y_pos + 15)>>3)->block_type != air) {
+		if (getBlockFromChunk(current_chunk, (x_loc  )>>3 , (n_y_pos + 14)>>3)->block_type != air ||
+			getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (n_y_pos + 14)>>3)->block_type != air) {
 				global_player.velocity_y = 0;
 				global_player.y = (((n_y_pos + 15)>>3)<<3) - 16;
 			}
@@ -1318,16 +1372,16 @@ void update_entities() {
 	//World Boundaries
 	if (global_player.x < 0)
 		global_player.x = 0;
-	else if (global_player.x >= chunk_width * 64)
-		global_player.x = chunk_width * 64 - 1;
+	else if (global_player.x >= (chunk_width * 64 - 1) * 8)
+		global_player.x = (chunk_width * 64 - 1) * 8;
 
 	// global camera
-	global_camera.x = global_player.x - screen_width / 2;
+	global_camera.x = global_player.x + 4 - screen_width / 2;
 	if (global_camera.x < 0)
 		global_camera.x = 0;
 	else if (global_camera.x >= chunk_width * 64 * 8 - screen_width)
 		global_camera.x = chunk_width * 64 - screen_width - 1;
-	global_camera.y = global_player.y - screen_height / 2;
+	global_camera.y = global_player.y + 8 - screen_height / 2;
 	if (global_camera.y < 0)
 		global_camera.y = 0;
 	else if (global_camera.y >= 128 * 8 - screen_width)
