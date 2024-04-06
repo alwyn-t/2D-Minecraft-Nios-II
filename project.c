@@ -665,7 +665,7 @@ void generate_map() {
 		}
 	}
 	for (int i = 0; i < chunk_width*tree_density; i++) {
-		printf("x: %i, y: %i\n", tree_locations[i*2], tree_locations[i*2+1]);
+		//printf("x: %i, y: %i\n", tree_locations[i*2], tree_locations[i*2+1]);
 		int tree_base_x = tree_locations[i*2];
 		int tree_base_y = tree_locations[i*2+1];
 		temp_chunk = getChunkFromPosition(tree_base_x);
@@ -1035,14 +1035,16 @@ void audio_playback_mono(int const *samples, int n) {
 	}
 }
 
-// game logic
+
 void update_blocks() {
 
+	int x_8 = (global_camera.x + global_controller_inputs.crosshair_x) >> 3;
+	int y_8 = (global_camera.y + global_controller_inputs.crosshair_y) >> 3;
+	
 	int x = global_player.x/8;
 	int y = global_player.y/8;
-	int y_offset = y - 17;
 
-	bool on_ground = getBlockFromChunk(getChunkFromPosition(x), (x) , (y*8-2)>>3)->block_type != air || getBlockFromChunk(getChunkFromPosition(x), (global_player.x+7)>>3 , (global_player.y-2)>>3)->block_type != air;
+	bool on_ground = getBlockFromChunk(getChunkFromPosition(x_8), (x_8) , (y_8*8-2)>>3)->block_type != air || getBlockFromChunk(getChunkFromPosition(x_8), (global_player.x+7)>>3 , (global_player.y-2)>>3)->block_type != air;
 	if(!on_ground){
 		return;
 	}
@@ -1050,7 +1052,6 @@ void update_blocks() {
 	//Place block
 	if (global_controller_inputs.place_block){
 		global_controller_inputs.place_block = false;
-
 
 		struct Block place_block = testBlock;
 		if(highlight_slot == 0)
@@ -1070,77 +1071,22 @@ void update_blocks() {
 		else if(highlight_slot == 7)
 			place_block = diamondBlock;
 
-
 		bool bplace = false;
 
-		if(global_controller_inputs.crosshair_x >> 3 == x+1 ){
-			if(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y-1)->block_type == air){
+		if(x_8 == x+1 || x_8 == x+2 || x_8  == x-1 || x_8  == x-2) {
+			if(getBlockFromChunk(getChunkFromPosition(x_8), x_8 , y-1)->block_type == air){
 		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y-1, place_block);
+		 		setBlockInChunk(getChunkFromPosition(x_8), x_8, y-1, place_block);
 				bplace = true;
 			}
-			else if(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y)->block_type == air){
+			else if(getBlockFromChunk(getChunkFromPosition(x_8), x_8 , y)->block_type == air){
 		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y, place_block);
+		 		setBlockInChunk(getChunkFromPosition(x_8), x_8, y, place_block);
 				bplace = true;
 			}
-			else if(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y+1)->block_type == air){
+			else if(getBlockFromChunk(getChunkFromPosition(x_8), x_8 , y+1)->block_type == air){
 		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y+1, place_block);
-				bplace = true;
-			}
-		}
-
-		else if(global_controller_inputs.crosshair_x >> 3 == x+2 ){
-			if(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y-1)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y-1, place_block);
-				bplace = true;
-			}
-			else if(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y, place_block);
-				bplace = true;
-			}
-			else if(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y+1)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y+1, place_block);
-				bplace = true;
-			}
-		}
-
-		else if(global_controller_inputs.crosshair_x >> 3 == x-1 ){
-			if(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y-1)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y-1, place_block);
-				bplace = true;
-			}
-			else if(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y, place_block);
-				bplace = true;
-			}
-			else if(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y+1)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y+1, place_block);
-				bplace = true;
-			}
-		}
-
-		else if(global_controller_inputs.crosshair_x >> 3 == x-2 ){
-			if(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y-1)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y-1, place_block);
-				bplace = true;
-			}
-			else if(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y, place_block);
-				bplace = true;
-			}
-			else if(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type == air){
-		 		audio_playback_mono(place_b, place_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y+1, place_block);
+		 		setBlockInChunk(getChunkFromPosition(x_8), x_8, y+1, place_block);
 				bplace = true;
 			}
 		}
@@ -1169,143 +1115,64 @@ void update_blocks() {
 		}
 	}
 
-	//Break Block
-	printf("%d %d\n", y, global_controller_inputs.crosshair_y >> 3);
+	//Break Blocks
 	if (global_controller_inputs.break_block) {
 		global_controller_inputs.break_block = false;
+		bool breakbb = false;
 
-		if(global_controller_inputs.crosshair_x >> 3 == x+1 && global_controller_inputs.crosshair_y >> 3  == (y_offset - 1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y-1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y-1, airBlock);
-			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x+1 && global_controller_inputs.crosshair_y >> 3  == (y_offset) ){
-			if(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y, airBlock);
+		if( (x_8 == x+1 && y_8 == y-1) || (x_8 == x+1 && y_8 == y) || (x_8 == x+1 && y_8 == y+1) || 
+		    (x_8 == x+2 && y_8 == y-1) || (x_8 == x+2 && y_8 == y) || (x_8 == x+2 && y_8 == y+1) ||
+			(x_8 == x-1 && y_8 == y-1) || (x_8 == x-1 && y_8 == y) || (x_8 == x-1 && y_8 == y+1) ||
+			(x_8 == x-2 && y_8 == y-1) || (x_8 == x-2 && y_8 == y) || (x_8 == x-2 && y_8 == y+1) ||
+			(x_8 == x && y_8 == y-1) ){
 
-			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x+1 && global_controller_inputs.crosshair_y >> 3  == (y_offset+1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y+1)->block_type != air){
+			if(getBlockFromChunk(getChunkFromPosition(x_8), x_8 , y_8)->block_type != air){
 		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y+1, airBlock);
-
+		 		setBlockInChunk(getChunkFromPosition(x_8), x_8, y_8, airBlock);
+				breakbb = true;
 			}
 		}
 
+		else if(!breakbb){
 
-		else if(global_controller_inputs.crosshair_x >> 3 == x+2 && global_controller_inputs.crosshair_y >> 3  == (y_offset - 1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y-1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y-1, airBlock);
+			if(global_player.direction){
+				if (getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y+1)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x+1), x+1, y+1, airBlock);
+				}
+				else if (getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x+1), x+1, y, airBlock);
+				}
+				else if (getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y+1)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x+2), x+2, y+1, airBlock);
+				}
+				else if (getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x+2), x+2, y, airBlock);
+				}
 			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x+2 && global_controller_inputs.crosshair_y >> 3  == (y_offset) ){
-			if(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y, airBlock);
-
+			else{
+				if (getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y+1)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x-1), x-1, y+1, airBlock);
+				}
+				else if (getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x-1), x-1, y, airBlock);
+				}
+				else if (getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x-2), x-2, y+1, airBlock);
+				}
+				else if (getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y)->block_type != air){
+					audio_playback_mono(block_b, block_b_num);
+					setBlockInChunk(getChunkFromPosition(x-2), x-2, y, airBlock);
+				}
 			}
+
 		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x+2 && global_controller_inputs.crosshair_y >> 3  == (y_offset+1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y+1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y+1, airBlock);
-
-			}
-		}
-
-
-		else if(global_controller_inputs.crosshair_x >> 3 == x-1 && global_controller_inputs.crosshair_y >> 3  == (y_offset - 1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y-1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y-1, airBlock);
-			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x-1 && global_controller_inputs.crosshair_y >> 3  == (y_offset) ){
-			if(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y, airBlock);
-
-			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x-1 && global_controller_inputs.crosshair_y >> 3  == (y_offset+1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y+1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y+1, airBlock);
-
-			}
-		}
-
-
-
-		else if(global_controller_inputs.crosshair_x >> 3 == x-2 && global_controller_inputs.crosshair_y >> 3  == (y_offset - 1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y-1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y-1, airBlock);
-			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x-2 && global_controller_inputs.crosshair_y >> 3  == (y_offset) ){
-			if(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y, airBlock);
-
-			}
-		}
-		else if(global_controller_inputs.crosshair_x >> 3 == x-2 && global_controller_inputs.crosshair_y >> 3  == (y_offset+1) ){
-			if(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type != air){
-		 		audio_playback_mono(block_b, block_b_num);
-		 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y+1, airBlock);
-
-			}
-		}
-
-
-
-
-
-
-
-
-
-		// if(global_player.direction){
-		// 	if (getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y+1)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y+1, airBlock);
-		// 	}
-		// 	else if (getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x+1), x+1, y, airBlock);
-		// 	}
-		// 	else if (getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y+1)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y+1, airBlock);
-		// 	}
-		// 	else if (getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x+2), x+2, y, airBlock);
-		// 	}
-		// }
-		// else{
-		// 	if (getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y+1)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y+1, airBlock);
-		// 	}
-		// 	else if (getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x-1), x-1, y, airBlock);
-		// 	}
-		// 	else if (getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y+1, airBlock);
-		// 	}
-		// 	else if (getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y)->block_type != air){
-		// 		audio_playback_mono(block_b, block_b_num);
-		// 		setBlockInChunk(getChunkFromPosition(x-2), x-2, y, airBlock);
-		// 	}
-		// }
 
 	}
 }
