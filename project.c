@@ -528,6 +528,7 @@ void audio_playback_mono(int const *samples, int n);
 
 // game logic
 void update_blocks();
+void update_position(struct Entity *entity);
 void update_entities();
 
 // general rendering
@@ -674,8 +675,8 @@ void generate_map() {
 		}
 		for (int x_local = -2; x_local < 3; x_local++) {
 			temp_chunk = getChunkFromPosition(tree_base_x + x_local);
-			for (int y_local = 2; y_local < 5; y_local++) {
-				if (y_local == 4)
+			for (int y_local = 2; y_local < 6; y_local++) {
+				if (y_local == 5)
 					if (x_local == -2 || x_local == 2)
 						continue;
 				if (getBlockFromChunk(temp_chunk, tree_base_x + x_local, tree_base_y + y_local)->block_type == air) {
@@ -1177,7 +1178,103 @@ void update_blocks() {
 	}
 }
 
+void update_position(struct Entity *entity) {
+	int x_offset = 0, width = 0, height = 0;
+	switch (entity->entity_type) {
+		case unassigned_entity:
+			return;
+		case dying_entity:
+			return;
+		case player:
+			x_offset = 2;
+			width = 4;
+			height = 14;
+			break;
+		case chicken:
+			x_offset = 2;
+			width = 4;
+			height = 4;
+			break;
+		case pig:
+			x_offset = 1;
+			width = 6;
+			height = 6;
+			break;
+		case cow:
+			x_offset = 0;
+			width = 8;
+			height = 8;
+			break;
+	}
+	double x = entity->x;
+	double y = entity->y;
+	int v_x = entity->velocity_x;
+	int v_y = entity->velocity_y;
+	bool right = (v_x > 0);
+	bool up = (v_y > 0);
+	double s_v_x = 0;
+	double s_v_y = 0;
+	int iterations = 0;
+	if (abs(v_x) > abs(v_y)) {
+		s_v_y = (double)v_y / abs(v_x);
+		s_v_x = (right) ? 1 : -1;
+		iterations = abs(v_x);
+	} else {
+		s_v_y = (up) ? 1 : -1;
+		s_v_x = (double)v_x / abs(v_y);
+		iterations = abs(v_y);
+	}
+	for (int i = 0; i < iterations; i++) {
+		printf("s_v_y %f\n", s_v_y);
+		if (v_x == 0 && v_y == 0)
+			break;
+		// if next y position is valid, move
+		int left_x = (x+x_offset)/8;
+		int right_x = (x+x_offset+width)/8;
+		struct Chunk *left_chunk = getChunkFromPosition(left_x);
+		struct Chunk *right_chunk = getChunkFromPosition(right_x);
+		if (getBlockFromChunk(left_chunk , left_x , (y+s_v_y+height)/8)->block_type != air ||
+			getBlockFromChunk(right_chunk, right_x, (y+s_v_y+height)/8)->block_type != air ||
+			getBlockFromChunk(left_chunk , left_x , (y+s_v_y+0)     /8)->block_type != air ||
+			getBlockFromChunk(right_chunk, right_x, (y+s_v_y+0)     /8)->block_type != air) {
+			v_y = 0;
+			s_v_y = 0;
+		}
+		else {
+			y += s_v_y;
+		}
 
+		// if next x position is valid, move
+		left_x = (x+s_v_x+x_offset)/8;
+		right_x = (x+s_v_x+x_offset+width)/8;
+		left_chunk = getChunkFromPosition(left_x);
+		right_chunk = getChunkFromPosition(right_x);
+		if (getBlockFromChunk(left_chunk , left_x , (y+height)/8)->block_type != air ||
+			getBlockFromChunk(right_chunk, right_x, (y+height)/8)->block_type != air ||
+			getBlockFromChunk(left_chunk , left_x , (y+0)     /8)->block_type != air ||
+			getBlockFromChunk(right_chunk, right_x, (y+0)     /8)->block_type != air) {
+			v_x = 0;
+			s_v_x = 0;
+		} else {
+			if (height > 8) {
+				if (getBlockFromChunk(left_chunk , left_x , (y+(height>>1))/8)->block_type != air ||
+					getBlockFromChunk(right_chunk, right_x, (y+(height>>1))/8)->block_type != air) {
+					v_x = 0;
+					s_v_x = 0;
+				} else {
+					x += s_v_x;
+				}
+			} else {
+				x += s_v_x;
+			}
+		}
+	}
+	// update entity
+	entity->x = x;
+	entity->y = y;
+	entity->velocity_x = v_x;
+	entity->velocity_y = v_y;
+}
 void update_entities() {
 	global_player.velocity_x = 0;
 
@@ -1201,40 +1298,7 @@ void update_entities() {
 	if (global_controller_inputs.jump && on_ground)
 		global_player.velocity_y = 4;
 
-	int n_x_pos = x_loc + global_player.velocity_x;
-	int n_y_pos = y_loc + global_player.velocity_y;
-	if (global_player.velocity_x > 0) {
-		if (getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 14)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 7)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (n_x_pos+7)>>3 , (y_loc + 0)>>3)->block_type != air) {
-				global_player.velocity_x = 0;
-				global_player.x = (((n_x_pos+7)>>3)<<3) - 8;
-			}
-	} else if (global_player.velocity_x < 0) {
-		if (getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 14)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 7)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (n_x_pos)>>3 , (y_loc + 0)>>3)->block_type != air) {
-				global_player.velocity_x = 0;
-				global_player.x = ((n_x_pos>>3)<<3) + 8;
-			}
-	}
-	if (global_player.velocity_y > 0) {
-		if (getBlockFromChunk(current_chunk, (x_loc  )>>3 , (n_y_pos + 14)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (n_y_pos + 14)>>3)->block_type != air) {
-				global_player.velocity_y = 0;
-				global_player.y = (((n_y_pos + 15)>>3)<<3) - 16;
-			}
-	} else if (global_player.velocity_y < 0) {
-		if (getBlockFromChunk(current_chunk, (x_loc  )>>3 , (n_y_pos)>>3)->block_type != air ||
-			getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (n_y_pos)>>3)->block_type != air) {
-				global_player.velocity_y = 0;
-				global_player.y = ((n_y_pos>>3)<<3) + 8;
-			}
-	}
-
-	global_player.x += global_player.velocity_x;
-
-	global_player.y += global_player.velocity_y;
+	update_position(&global_player);
 
 	//World Boundaries
 	if (global_player.x < 0)
