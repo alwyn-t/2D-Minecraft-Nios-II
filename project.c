@@ -463,8 +463,13 @@ struct Chunk {
 struct Block *getBlockFromChunk(struct Chunk *chunk, int x_8, int y_8);
 void setBlockInChunk(struct Chunk *chunk, int x_8, int y_8, struct Block block);
 #define chunk_width 16
+#define cycle_time 18000
+#define cycle_colour_num 25
+short int cycle_colours[cycle_colour_num] = {0x0882, 0x0084, 0x00C5, 0x00E6, 0x01CE, 0x020E, 0x0332, 0x0393, 0x1518, 0x76B9, 0xEF77, 0xFFEA, 0xFE0A, 0xFD6D, 0xFD2B, 0xFCEB, 0xF429, 0xF34F, 0xCAD2, 0x5970, 0x30CF, 0x28AD, 0x0047, 0x194C, 0x012B};
+
 struct World {
 	struct Chunk chunk_array[chunk_width];
+	int time;
 };
 
 struct Chunk *getChunkFromPosition(int x_8);
@@ -567,6 +572,7 @@ int main(void) {
 	}
 
 	while (1) {
+		global_world.time = (global_world.time + 2) % cycle_time; // ranges from 0 to 18,000
 		//printf("draw\n");
 		LEDR(switch_poll());
 		PS2_port1_poll();
@@ -673,10 +679,10 @@ void generate_map() {
 		for (int y_local = 0; y_local < 4; y_local++) {
 			setBlockInChunk(temp_chunk, tree_base_x, tree_base_y + y_local, woodBlock);
 		}
-		for (int x_local = -2; x_local < 3; x_local++) {
+		for (int x_local = -2; x_local <= 2; x_local++) {
 			temp_chunk = getChunkFromPosition(tree_base_x + x_local);
 			for (int y_local = 2; y_local < 6; y_local++) {
-				if (y_local == 5)
+				if (y_local == 4 || y_local == 5)
 					if (x_local == -2 || x_local == 2)
 						continue;
 				if (getBlockFromChunk(temp_chunk, tree_base_x + x_local, tree_base_y + y_local)->block_type == air) {
@@ -685,6 +691,8 @@ void generate_map() {
 			}
 		}
 	}
+
+	global_world.time = 0;
 
 	//setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
 	// setBlockInChunk(getChunkFromPosition(50), 50, 32, temp_dirt_block);
@@ -733,16 +741,45 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 
 	// screen refers to screen position, local refers to pixel within the block
 	int block_screen_x, block_screen_y, block_local_x, block_local_y;
-	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-		block_screen_x = corner_of_block_screen_x + block_local_x;
-		if (block_screen_x < 0 || block_screen_x >= screen_width)
-			continue;
+	if (texture_array != air_block_texture) {
+		for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+			block_screen_x = corner_of_block_screen_x + block_local_x;
+			if (block_screen_x < 0 || block_screen_x >= screen_width)
+				continue;
+			for (block_local_y = 0; block_local_y < 8; block_local_y++) {
+				block_screen_y = corner_of_block_screen_y + block_local_y;
+				if (block_screen_y < 0 || block_screen_y >= screen_height)
+					continue;
+				plot_pixel(block_screen_x, block_screen_y,
+				texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
+			}
+		}
+	} else {
+		#define sky_colour_separation 25
+		float day_percentage = (float)global_world.time / cycle_time;
+		float starting_colour_index = cycle_colour_num * day_percentage;
 		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
 			block_screen_y = corner_of_block_screen_y + block_local_y;
 			if (block_screen_y < 0 || block_screen_y >= screen_height)
 				continue;
-			plot_pixel(block_screen_x, block_screen_y,
-			texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
+			float temp_index = starting_colour_index + (float)block_screen_y / sky_colour_separation;
+			int colour_index = (int)(temp_index) % cycle_colour_num;
+			bool edge = temp_index - floor(temp_index) < 0.1;
+			if (!edge) {
+				for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+					block_screen_x = corner_of_block_screen_x + block_local_x;
+					if (block_screen_x < 0 || block_screen_x >= screen_width)
+						continue;
+					plot_pixel(block_screen_x, block_screen_y, cycle_colours[colour_index]);
+				}
+			} else {
+				for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+					block_screen_x = corner_of_block_screen_x + block_local_x;
+					if (block_screen_x < 0 || block_screen_x >= screen_width)
+						continue;
+					plot_pixel(block_screen_x, block_screen_y, (block_screen_x%2) ? cycle_colours[colour_index] : cycle_colours[(colour_index-1)%cycle_colour_num]);
+				}
+			}
 		}
 	}
 }
@@ -1041,7 +1078,7 @@ void update_blocks() {
 
 	int x_8 = (global_camera.x + global_controller_inputs.crosshair_x) >> 3;
 	int y_8 = (global_camera.y + global_controller_inputs.crosshair_y) >> 3;
-	
+
 	int x = global_player.x/8;
 	int y = global_player.y/8;
 
@@ -1121,7 +1158,7 @@ void update_blocks() {
 		global_controller_inputs.break_block = false;
 		bool breakbb = false;
 
-		if( (x_8 == x+1 && y_8 == y-1) || (x_8 == x+1 && y_8 == y) || (x_8 == x+1 && y_8 == y+1) || 
+		if( (x_8 == x+1 && y_8 == y-1) || (x_8 == x+1 && y_8 == y) || (x_8 == x+1 && y_8 == y+1) ||
 		    (x_8 == x+2 && y_8 == y-1) || (x_8 == x+2 && y_8 == y) || (x_8 == x+2 && y_8 == y+1) ||
 			(x_8 == x-1 && y_8 == y-1) || (x_8 == x-1 && y_8 == y) || (x_8 == x-1 && y_8 == y+1) ||
 			(x_8 == x-2 && y_8 == y-1) || (x_8 == x-2 && y_8 == y) || (x_8 == x-2 && y_8 == y+1) ||
