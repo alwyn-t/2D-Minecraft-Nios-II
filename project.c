@@ -1325,7 +1325,7 @@ void update_position(struct Entity *entity) {
 			getBlockFromChunk(right_chunk, right_x, (y+s_v_y+0)     /8)->block_type != air) {
 
 			if(v_y < 0){
-				hearts += v_y/5;
+				hearts += v_y/7;
 			}
 			v_y = 0;
 			s_v_y = 0;
