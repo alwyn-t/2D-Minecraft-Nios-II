@@ -483,6 +483,8 @@ struct World {
 	struct Chunk chunk_array[chunk_width];
 	int time;
 };
+#define sky_colour_separation 25
+short int sky_colour = 0;
 
 struct Chunk *getChunkFromPosition(int x_8);
 struct World global_world;
@@ -587,7 +589,16 @@ int main(void) {
 	}
 
 	while (1) {
-		global_world.time = (global_world.time + 2) % cycle_time; // ranges from 0 to 18,000
+		global_world.time = (global_world.time + 10) % cycle_time; // ranges from 0 to 18,000
+		float cycle_position = cycle_colour_num*(float)global_world.time/cycle_time;
+		int lower_index = floor(cycle_position);
+		float percentage = cycle_position - lower_index;
+		short int upper_sky_colour = cycle_colours[(lower_index + 1)%cycle_colour_num];
+		short int lower_sky_colour = cycle_colours[lower_index%cycle_colour_num];
+		short int R = (int)((upper_sky_colour & 0xF800) * percentage + (lower_sky_colour & 0xF800) * (1 - percentage)) & 0xF800;
+		short int G = (int)((upper_sky_colour & 0x07E0) * percentage + (lower_sky_colour & 0x07E0) * (1 - percentage)) & 0x07E0;
+		short int B = (int)((upper_sky_colour & 0x001F) * percentage + (lower_sky_colour & 0x001F) * (1 - percentage)) & 0x001F;
+		sky_colour = R + G + B;
 		//printf("draw\n");
 		LEDR(switch_poll());
 		PS2_port1_poll();
@@ -608,7 +619,7 @@ int main(void) {
 			global_player.x = 4096;
 			global_player.y = 256;
 		}
-		
+
 		wait_for_vsync_and_swap();
 	}
 }
@@ -708,7 +719,7 @@ void generate_map() {
 		}
 	}
 
-	global_world.time = 0;
+	global_world.time = cycle_time >> 2; // 1/4 into the cycle
 
 	//setBlockInChunk(&global_world.chunk_array[0], 32, 32, temp_dirt_block);
 	// setBlockInChunk(getChunkFromPosition(50), 50, 32, temp_dirt_block);
@@ -771,30 +782,15 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 			}
 		}
 	} else {
-		#define sky_colour_separation 25
-		float day_percentage = (float)global_world.time / cycle_time;
-		float starting_colour_index = cycle_colour_num * day_percentage;
 		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
 			block_screen_y = corner_of_block_screen_y + block_local_y;
 			if (block_screen_y < 0 || block_screen_y >= screen_height)
 				continue;
-			float temp_index = starting_colour_index + (float)block_screen_y / sky_colour_separation;
-			int colour_index = (int)(temp_index) % cycle_colour_num;
-			bool edge = temp_index - floor(temp_index) < 0.1;
-			if (!edge) {
-				for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-					block_screen_x = corner_of_block_screen_x + block_local_x;
-					if (block_screen_x < 0 || block_screen_x >= screen_width)
-						continue;
-					plot_pixel(block_screen_x, block_screen_y, cycle_colours[colour_index]);
-				}
-			} else {
-				for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-					block_screen_x = corner_of_block_screen_x + block_local_x;
-					if (block_screen_x < 0 || block_screen_x >= screen_width)
-						continue;
-					plot_pixel(block_screen_x, block_screen_y, (block_screen_x%2) ? cycle_colours[colour_index] : cycle_colours[(colour_index-1)%cycle_colour_num]);
-				}
+			for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+				block_screen_x = corner_of_block_screen_x + block_local_x;
+				if (block_screen_x < 0 || block_screen_x >= screen_width)
+					continue;
+				plot_pixel(block_screen_x, block_screen_y, sky_colour);
 			}
 		}
 	}
@@ -938,7 +934,7 @@ void draw_bar(){
 	draw_block_lock(&obsidianBlock,192, 48);
 	draw_block_lock(&oreBlock,216, 48);
 	draw_block_lock(&diamondBlock,240 , 48);
-	
+
 	draw_hearts();
 }
 
@@ -1282,7 +1278,6 @@ void update_position(struct Entity *entity) {
 		iterations = abs(v_y);
 	}
 	for (int i = 0; i < iterations; i++) {
-		printf("s_v_y %f\n", s_v_y);
 		if (v_x == 0 && v_y == 0)
 			break;
 		// if next y position is valid, move
@@ -1294,7 +1289,7 @@ void update_position(struct Entity *entity) {
 			getBlockFromChunk(right_chunk, right_x, (y+s_v_y+height)/8)->block_type != air ||
 			getBlockFromChunk(left_chunk , left_x , (y+s_v_y+0)     /8)->block_type != air ||
 			getBlockFromChunk(right_chunk, right_x, (y+s_v_y+0)     /8)->block_type != air) {
-			
+
 			if(v_y < 0){
 				hearts += v_y/5;
 			}
