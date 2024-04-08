@@ -1061,7 +1061,7 @@ void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_cou
 					global_controller_inputs.crosshair_x = screen_width - 1;
 
 				// byte 0 [Y movement]
-				global_controller_inputs.crosshair_y -= byte0;
+				global_controller_inputs.crosshair_y += byte0;
 
 				if(global_controller_inputs.crosshair_y < 0)
 					global_controller_inputs.crosshair_y = 0;
@@ -1324,7 +1324,8 @@ void update_position(struct Entity *entity) {
 			getBlockFromChunk(left_chunk , left_x , (y+s_v_y+0)     /8)->block_type != air ||
 			getBlockFromChunk(right_chunk, right_x, (y+s_v_y+0)     /8)->block_type != air) {
 
-			if(v_y < 0){
+			if(v_y < 0 && v_y >= -7){
+				printf("V: %d\n", v_y);
 				hearts += v_y/7;
 			}
 			v_y = 0;
@@ -1380,6 +1381,8 @@ void update_entities() {
 
 	if (global_player.velocity_y > -7)
 		global_player.velocity_y -= 1;
+	else if (global_player.velocity_y < -7)
+		global_player.velocity_y = -7;
 	if (global_controller_inputs.left) {
 		global_player.velocity_x -= (global_controller_inputs.sprint) ? 4 : ((global_controller_inputs.sneak) ? 1 : 2);
 		global_player.direction = false;
@@ -1406,6 +1409,8 @@ void update_entities() {
 		bool on_ground = getBlockFromChunk(current_chunk, (left_x) , (item_y-2)>>3)->block_type != air || getBlockFromChunk(adjacent_chunk, right_x , (item_y-2)>>3)->block_type != air;
 		if (global_items[i].entity.velocity_y > -7)
 			global_items[i].entity.velocity_y -= 1;
+		else if (global_items[i].entity.velocity_y < -7)
+			global_items[i].entity.velocity_y = -7;
 		if (on_ground)
 			global_items[i].entity.velocity_x = 0;
 		update_position(&global_items[i].entity);
