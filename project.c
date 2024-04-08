@@ -445,7 +445,9 @@ struct Block obsidianBlock = {obsidian, true, 0};
 struct Block diamondBlock = {diamond, true, 0};
 struct Block oreBlock = {ore, true, 0};
 
-enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow };
+const short int* getTexture(enum BlockType block_type);
+
+enum EntityType { unassigned_entity, dying_entity, player, chicken, pig, cow, item};
 struct Entity {
 	int x;
 	int y;
@@ -457,9 +459,20 @@ struct Entity {
 };
 
 struct Entity global_player;
-#define mob_cap 100
+#define mob_cap 50
 struct Entity global_passive_mobs[mob_cap];
+int next_passive_mob_index = 0;
 struct Entity global_hostile_mobs[mob_cap];
+int next_hostile_mob_index = 0;
+
+struct Item {
+	enum BlockType block_type;
+	struct Entity entity;
+};
+
+#define item_cap 10
+struct Item global_items[item_cap];
+int next_item_index = 0;
 
 // centre of the camera position
 struct camera {
@@ -498,12 +511,15 @@ void save_map();
 // game rendering
 void draw_block(struct Block *, int x_8, int y_8);
 void draw_blocks();
+void draw_item(struct Item *item);
 void draw_entity(struct Entity *entity);
 void draw_entities();
 void draw_block_overlay(struct Block *, int x_8, int y_8);
 void draw_block_overlays();
 void draw_hollow_box(int x_input, int y_input, int colour);
 void draw_map();
+void draw_4x4(short int const *, int x, int y);
+void draw_8x8(short int const *, int x, int y);
 void draw_8x8_transparent(short int const *, int x, int y);
 void draw_crosshair();
 void draw_block_select_overlay();
@@ -549,6 +565,7 @@ void PS2_poll(volatile int *PS2_data_ptr, bool* PS2_keyboard, int* PS2_mouse_cou
 void audio_playback_mono(int const *samples, int n);
 
 // game logic
+void spawn_item(enum BlockType block_type, int x, int y);
 void update_blocks();
 void update_position(struct Entity *entity);
 void update_entities();
@@ -625,6 +642,31 @@ int main(void) {
 }
 
 // game definitions
+const short int* getTexture(enum BlockType block_type) {
+	switch (block_type) {
+	case grass_block:
+		return grass_block_texture;
+	case dirt:
+		return dirt_block_texture;
+	case air:
+		return air_block_texture;
+	case stone:
+		return stone_block_texture;
+	case leaves:
+		return leaf_block_texture;
+	case oak_wood_log:
+		return wood_block_texture;
+	case obsidian:
+		return obsidian_block_texture;
+	case diamond:
+		return diamond_block_texture;
+	case ore:
+		return ore_block_texture;
+	default:
+		return dirt_block_texture;
+	}
+}
+
 struct Block *getBlockFromChunk(struct Chunk *chunk, int x_8, int y_8) {
 	return &chunk->block_array[(x_8 & 0x3F) + (y_8 << 6)];
 }
@@ -660,6 +702,11 @@ void generate_map() {
 	for (int i = 0; i < mob_cap; i++) {
 		global_passive_mobs[i] = temp_blank_entity;
 		global_hostile_mobs[i] = temp_blank_entity;
+	}
+	struct Entity temp_blank_item_entity = {0, 0, 0, 0, item, 0};
+	struct Item temp_blank_item = {air, temp_blank_item_entity};
+	for (int i = 0; i < item_cap; i++) {
+		global_items[i] = temp_blank_item;
 	}
 
 	// generate new map
@@ -732,55 +779,12 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 	int corner_of_block_screen_x = (x_8 << 3) - global_camera.x;
 	int corner_of_block_screen_y = (y_8 << 3) - global_camera.y;
 
-	short int const *texture_array;
-	switch (block->block_type) {
-		case grass_block:
-			texture_array = grass_block_texture;
-			break;
-		case dirt:
-			texture_array = dirt_block_texture;
-			break;
-		case air:
-			texture_array = air_block_texture;
-			break;
-		case stone:
-			texture_array = stone_block_texture;
-			break;
-		case leaves:
-			texture_array = leaf_block_texture;
-			break;
-		case oak_wood_log:
-			texture_array = wood_block_texture;
-			break;
-		case obsidian:
-			texture_array = obsidian_block_texture;
-			break;
-		case diamond:
-			texture_array = diamond_block_texture;
-			break;
-		case ore:
-			texture_array = ore_block_texture;
-			break;
-		default:
-			texture_array = dirt_block_texture;
-			break;
-	}
+	short int const *texture_array = getTexture(block->block_type);
 
 	// screen refers to screen position, local refers to pixel within the block
 	int block_screen_x, block_screen_y, block_local_x, block_local_y;
 	if (texture_array != air_block_texture) {
-		for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-			block_screen_x = corner_of_block_screen_x + block_local_x;
-			if (block_screen_x < 0 || block_screen_x >= screen_width)
-				continue;
-			for (block_local_y = 0; block_local_y < 8; block_local_y++) {
-				block_screen_y = corner_of_block_screen_y + block_local_y;
-				if (block_screen_y < 0 || block_screen_y >= screen_height)
-					continue;
-				plot_pixel(block_screen_x, block_screen_y,
-				texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
-			}
-		}
+		draw_8x8(texture_array, corner_of_block_screen_x, corner_of_block_screen_y);
 	} else {
 		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
 			block_screen_y = corner_of_block_screen_y + block_local_y;
@@ -796,47 +800,10 @@ void draw_block(struct Block *block, int x_8, int y_8) {
 	}
 }
 void draw_block_lock(struct Block *block, int x, int y) {
-	short int const *texture_array;
-	switch (block->block_type) {
-		case grass_block:
-			texture_array = grass_block_texture;
-			break;
-		case dirt:
-			texture_array = dirt_block_texture;
-			break;
-		case air:
-			texture_array = air_block_texture;
-			break;
-		case stone:
-			texture_array = stone_block_texture;
-			break;
-		case leaves:
-			texture_array = leaf_block_texture;
-			break;
-		case oak_wood_log:
-			texture_array = wood_block_texture;
-			break;
-		case obsidian:
-			texture_array = obsidian_block_texture;
-			break;
-		case diamond:
-			texture_array = diamond_block_texture;
-			break;
-		case ore:
-			texture_array = ore_block_texture;
-			break;
-		default:
-			texture_array = dirt_block_texture;
-			break;
-	}
+	short int const *texture_array = getTexture(block->block_type);
+
 	// screen refers to screen position, local refers to pixel within the block
-	int block_local_x, block_local_y;
-	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
-		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
-			plot_pixel(x+block_local_x, y+block_local_y,
-			texture_array[block_local_x + (8 - 1 - block_local_y) * 8]);
-		}
-	}
+	draw_8x8(texture_array, x, y);
 }
 void draw_blocks() {
 	int camera_x_8 = global_camera.x >> 3;
@@ -850,6 +817,11 @@ void draw_blocks() {
 				draw_block(getBlockFromChunk(temp_chunk, x_8 & 0x3F, y_8), x_8, y_8);
 			}
 		}
+	}
+}
+void draw_item(struct Item *item) {
+	if (item->block_type != air) {
+		draw_4x4(getTexture(item->block_type), item->entity.x - global_camera.x, item->entity.y - global_camera.y);
 	}
 }
 void draw_entity(struct Entity *entity) {
@@ -870,11 +842,41 @@ void draw_entities() {
 		draw_entity(&global_passive_mobs[i]);
 	for (int i = 0; i < mob_cap; i++)
 		draw_entity(&global_hostile_mobs[i]);
+	for (int i = 0; i < item_cap; i++)
+		draw_item(&global_items[i]);
 	draw_entity(&global_player);
 }
 void draw_block_overlay(struct Block *block, int x_8, int y_8) {}
 void draw_block_overlays() {}
 void draw_map() {}
+void draw_4x4(short int const *texture, int x, int y) {
+	int block_screen_x, block_screen_y, block_local_x, block_local_y;
+	for (block_local_x = 0; block_local_x < 4; block_local_x++) {
+		block_screen_x = x + block_local_x+2;
+		if (block_screen_x < 0 || block_screen_x >= screen_width)
+			continue;
+		for (block_local_y = 0; block_local_y < 4; block_local_y++) {
+			block_screen_y = y + block_local_y;
+			if (block_screen_y < 0 || block_screen_y >= screen_height)
+				continue;
+			plot_pixel(block_screen_x, block_screen_y, texture[block_local_x*2 + (8 - 1 - block_local_y*2) * 8]);
+		}
+	}
+}
+void draw_8x8(short int const *texture, int x, int y) {
+	int block_screen_x, block_screen_y, block_local_x, block_local_y;
+	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
+		block_screen_x = x + block_local_x;
+		if (block_screen_x < 0 || block_screen_x >= screen_width)
+			continue;
+		for (block_local_y = 0; block_local_y < 8; block_local_y++) {
+			block_screen_y = y + block_local_y;
+			if (block_screen_y < 0 || block_screen_y >= screen_height)
+				continue;
+			plot_pixel(block_screen_x, block_screen_y, texture[block_local_x + (8 - 1 - block_local_y) * 8]);
+		}
+	}
+}
 void draw_8x8_transparent(short int const *texture, int x, int y) {
 	int block_screen_x, block_screen_y, block_local_x, block_local_y;
 	for (block_local_x = 0; block_local_x < 8; block_local_x++) {
@@ -1090,6 +1092,17 @@ void audio_playback_mono(int const *samples, int n) {
 }
 
 
+void spawn_item(enum BlockType block_type, int x, int y) {
+	int starting_index = next_item_index;
+	while (global_items[next_item_index].block_type != air) {
+		next_item_index = (next_item_index + 1) % item_cap;
+		if (next_item_index == starting_index)
+			return;
+	}
+	global_items[next_item_index].block_type = block_type;
+	struct Entity item_entity = {x, y+2, (next_item_index & 1) ? 2 : -2, 3, item, 0, (next_item_index & 1)};
+	global_items[next_item_index].entity = item_entity;
+}
 void update_blocks() {
 
 	int x_8 = (global_camera.x + global_controller_inputs.crosshair_x) >> 3;
@@ -1182,6 +1195,8 @@ void update_blocks() {
 
 			if(getBlockFromChunk(getChunkFromPosition(x_8), x_8 , y_8)->block_type != air){
 		 		audio_playback_mono(block_b, block_b_num);
+				printf("block broken at x: %i, y: %i\n", x_8 << 3, y_8<<3);
+				spawn_item(getBlockFromChunk(getChunkFromPosition(x_8), x_8 , y_8)->block_type, (x_8) << 3, (y_8) << 3);
 		 		setBlockInChunk(getChunkFromPosition(x_8), x_8, y_8, airBlock);
 				breakbb = true;
 			}
@@ -1192,36 +1207,44 @@ void update_blocks() {
 			if(global_player.direction){
 				if (getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y+1)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y+1)->block_type, (x+1) << 3, (y+1) << 3);
 					setBlockInChunk(getChunkFromPosition(x+1), x+1, y+1, airBlock);
 				}
 				else if (getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x+1), x+1 , y)->block_type, (x+1) << 3, (y) << 3);
 					setBlockInChunk(getChunkFromPosition(x+1), x+1, y, airBlock);
 				}
 				else if (getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y+1)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y+1)->block_type, (x+2) << 3, (y+1) << 3);
 					setBlockInChunk(getChunkFromPosition(x+2), x+2, y+1, airBlock);
 				}
 				else if (getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x+2), x+2 , y)->block_type, (x+2) << 3, (y) << 3);
 					setBlockInChunk(getChunkFromPosition(x+2), x+2, y, airBlock);
 				}
 			}
 			else{
 				if (getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y+1)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y+1)->block_type, (x-1) << 3, (y+1) << 3);
 					setBlockInChunk(getChunkFromPosition(x-1), x-1, y+1, airBlock);
 				}
 				else if (getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x-1), x-1 , y)->block_type, (x-1) << 3, (y) << 3);
 					setBlockInChunk(getChunkFromPosition(x-1), x-1, y, airBlock);
 				}
 				else if (getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type, (x-2) << 3, (y+1) << 3);
 					setBlockInChunk(getChunkFromPosition(x-2), x-2, y+1, airBlock);
 				}
 				else if (getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y)->block_type != air){
 					audio_playback_mono(block_b, block_b_num);
+					spawn_item(getBlockFromChunk(getChunkFromPosition(x-2), x-2 , y+1)->block_type, (x-2) << 3, (y+1) << 3);
 					setBlockInChunk(getChunkFromPosition(x-2), x-2, y, airBlock);
 				}
 			}
@@ -1258,6 +1281,11 @@ void update_position(struct Entity *entity) {
 			width = 8;
 			height = 8;
 			break;
+		case item:
+			x_offset = 2;
+			width = 4;
+			height = 4;
+			break;
 	}
 	double x = entity->x;
 	double y = entity->y;
@@ -1282,7 +1310,7 @@ void update_position(struct Entity *entity) {
 			break;
 		// if next y position is valid, move
 		int left_x = (x+x_offset)/8;
-		int right_x = (x+x_offset+width)/8;
+		int right_x = (x+x_offset+width-1)/8;
 		struct Chunk *left_chunk = getChunkFromPosition(left_x);
 		struct Chunk *right_chunk = getChunkFromPosition(right_x);
 		if (getBlockFromChunk(left_chunk , left_x , (y+s_v_y+height)/8)->block_type != air ||
@@ -1302,7 +1330,7 @@ void update_position(struct Entity *entity) {
 
 		// if next x position is valid, move
 		left_x = (x+s_v_x+x_offset)/8;
-		right_x = (x+s_v_x+x_offset+width)/8;
+		right_x = (x+s_v_x+x_offset+width-1)/8;
 		left_chunk = getChunkFromPosition(left_x);
 		right_chunk = getChunkFromPosition(right_x);
 		if (getBlockFromChunk(left_chunk , left_x , (y+height)/8)->block_type != air ||
@@ -1332,14 +1360,17 @@ void update_position(struct Entity *entity) {
 	entity->velocity_y = v_y;
 }
 void update_entities() {
+	// spawn entities
+
 	global_player.velocity_x = 0;
 
 	int x_loc = global_player.x;
 	int y_loc = global_player.y;
 
 	struct Chunk *current_chunk = getChunkFromPosition(x_loc>>3);
+	struct Chunk *adjacent_chunk = getChunkFromPosition((x_loc+7)>>3);
 
-	bool on_ground = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc-2)>>3)->block_type != air || getBlockFromChunk(current_chunk, (x_loc+7)>>3 , (y_loc-2)>>3)->block_type != air;
+	bool on_ground = getBlockFromChunk(current_chunk, (x_loc>>3) , (y_loc-2)>>3)->block_type != air || getBlockFromChunk(adjacent_chunk, (x_loc+7)>>3 , (y_loc-2)>>3)->block_type != air;
 
 	if (global_player.velocity_y > -7)
 		global_player.velocity_y -= 1;
@@ -1355,6 +1386,24 @@ void update_entities() {
 		global_player.velocity_y = 4;
 
 	update_position(&global_player);
+
+	for (int i = 0; i < mob_cap; i++) {
+		update_position(&global_passive_mobs[i]);
+		update_position(&global_hostile_mobs[i]);
+	}
+	for (int i = 0; i < item_cap; i++) {
+		int item_y = global_items[i].entity.y;
+		int left_x = (global_items[i].entity.x+2)>>3;
+		int right_x = (global_items[i].entity.x+5)>>3;
+		struct Chunk *current_chunk = getChunkFromPosition(left_x);
+		struct Chunk *adjacent_chunk = getChunkFromPosition(right_x);
+		bool on_ground = getBlockFromChunk(current_chunk, (left_x) , (item_y-2)>>3)->block_type != air || getBlockFromChunk(adjacent_chunk, right_x , (item_y-2)>>3)->block_type != air;
+		if (global_items[i].entity.velocity_y > -7)
+			global_items[i].entity.velocity_y -= 1;
+		if (on_ground)
+			global_items[i].entity.velocity_x = 0;
+		update_position(&global_items[i].entity);
+	}
 
 	//World Boundaries
 	if (global_player.x < 0)
