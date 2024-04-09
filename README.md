@@ -42,7 +42,7 @@ To run this game, you are required to have the following:
 9. When prompted, select `Yes` to download the Nios II system to the DE1-SoC board.
 10. Once the system is loaded, click the `Compile & load the current program configuration and start the debugging session`.
     [^1]: Ensure all folders do not include white spaces to avoid errors
-    [^2]: Monitor Program 18.1 does not properly generate the correct makefile so it is required to add the -lm flag here: `$(CC) $(LDFLAGS) $(OBJS) **-lm** -o $@`
+    [^2]: Monitor Program 18.1 does not properly generate the correct makefile so it is required to add the -lm flag here: <pre>$(CC) $(LDFLAGS) $(OBJS) <b>-lm</b> -o $@</pre>
 
 ## How to play once compiled
 
@@ -53,14 +53,23 @@ To run this game, you are required to have the following:
 ## Controls
 
 `E` - start game
+
 `A` - move left
+
 `D` - move right
+
 `Space` - jump
+
 `1-8` - switch selected blocks
+
 `Ctrl` - sprint (faster left and right movement)
+
 `Shift` - sneak (slower left and right movement)
+
 `Mouse position` - crosshair movement
+
 `Left click` - break block (up to 2 blocks in front of the player)
+
 `Right click` - place block (up to 2 blocks in front of the player)
 
 ## I/O Components
@@ -113,10 +122,7 @@ To create interesting worlds, the world generation uses custom formulas to creat
 
 #### Height Map Functions
 
-`y_h`: hill height map
-`y_m`: mountain height map
-`w_h`: hill weighting
-`w_m`: mountain weighting
+`y_h`: hill height map, `y_m`: mountain height map, `w_h`: hill weighting, `w_m`: mountain weighting
 
 ```cpp
 double y_h = 3 * (pow(sin(x/10),2)*sin(x/15+2)/1.5 + cos(x/35)*sin(x/20));
