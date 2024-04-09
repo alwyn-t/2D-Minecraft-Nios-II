@@ -31,6 +31,8 @@ To run this game, you are required to have the following:
 
 ## Configuration
 
+> Note: Running this project on the Nios II processor is low, however the De1-SoC board does include an ARM chip which can be used instead to have a faster frame rate. Installation guide is the same as the Nios II processor except for switching the architecture in step 3 from `Nios II` to `ARM Cortex-A9` and explicitly adding the compiler flag in step 6 to include `-std=c99`.
+
 1. Begin by opening the monitor program (version 18.0 or 18.1 works).
 2. Create a new project by going to `File > New Project…`.
 3. Within the pop up window, specify a project directory[^1], project name and select `Nios II` for the architecture then click `Next >`.
@@ -167,22 +169,22 @@ We have 25 different colour states for different times of the day and night cycl
 
 ## Attribution Table
 
-||Aryan Hussian|Alwyn Tong|
-|---|---|---|
-|**I/O**|---|---|
-|VGA Output/Rendering| |`WD` `MR`|
-|PS/2 Keyboard| |`WD` `MR`|
-|PS/2 Mouse|`ET`|`WD` `MR`|
-|Sound|`WD` `MR`| |
-|**Gameplay**|---|---|
-|World Generation| |`WD` `MR`|
-|Block Textures|`WD`|`WD` `MR`|
-|Start Screen|`WD` `MR`| |
-|Player Movement|`ET`|`WD` `MR`|
-|Entity Collision|`WD`|`MR`|
-|Toolbar|`WD` `MR`| |
-|Health + Fall Damage|`WD` `MR`| |
-|Day and Night Cycle| |`WD` `MR`|
-|Items| |`WD` `MR`|
+|                      | Aryan Hussian | Alwyn Tong |
+| -------------------- | ------------- | ---------- |
+| **I/O**              | ---           | ---        |
+| VGA Output/Rendering |               | `WD` `MR`  |
+| PS/2 Keyboard        |               | `WD` `MR`  |
+| PS/2 Mouse           | `ET`          | `WD` `MR`  |
+| Sound                | `WD` `MR`     |            |
+| **Gameplay**         | ---           | ---        |
+| World Generation     |               | `WD` `MR`  |
+| Block Textures       | `WD`          | `WD` `MR`  |
+| Start Screen         | `WD` `MR`     |            |
+| Player Movement      | `ET`          | `WD` `MR`  |
+| Entity Collision     | `WD`          | `MR`       |
+| Toolbar              | `WD` `MR`     |            |
+| Health + Fall Damage | `WD` `MR`     |            |
+| Day and Night Cycle  |               | `WD` `MR`  |
+| Items                |               | `WD` `MR`  |
 
 `WD` - Working Draft, `MR` - Major Revision, `ET` - Edited
