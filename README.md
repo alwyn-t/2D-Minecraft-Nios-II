@@ -101,7 +101,7 @@ A lot of the infrastructure was built using structs to ensure proper organisatio
 
 ### Blocks
 
-Each block is an 8x8 pixel box that uses texture arrays to display each block on screen. Transparency is achieved by assigning the 0x0 as ‘transparent’ so anytime the processor receives a 0x0 colour, it will not draw that pixel so any colour behind will be visible. This can most easily be seen with the leaf blocks.
+Each block is an 8x8 pixel box that uses texture arrays to display each block on screen. Transparency is achieved by assigning the 0x0 as `transparent` so anytime the processor receives a 0x0 colour, it will not draw that pixel so any colour behind will be visible. This can most easily be seen with the leaf blocks.
 
 ### Chunks
 
@@ -113,19 +113,24 @@ To create interesting worlds, the world generation uses custom formulas to creat
 
 #### Height Map Functions
 
-```
-double y_h = 3 * (pow(sin(x/10),2)*sin(x/15+2)/1.5 + cos(x/35)*sin(x/20)); // hill function
-double y_m = 4 * (pow(sin(2*x/25),3)*cos(x/15) + pow(sin(6*x/35), 2)*sin(7*x/15)/2); // mountain function
-double w_h = pow(sin(x/30), 4); // hill weight
-double w_m = 1 - w_h; // mountain weight
+`y_h`: hill height map
+`y_m`: mountain height map
+`w_h`: hill weighting
+`w_m`: mountain weighting
+
+```cpp
+double y_h = 3 * (pow(sin(x/10),2)*sin(x/15+2)/1.5 + cos(x/35)*sin(x/20));
+double y_m = 4 * (pow(sin(2*x/25),3)*cos(x/15) + pow(sin(6*x/35), 2)*sin(7*x/15)/2);
+double w_h = pow(sin(x/30), 4);
+double w_m = 1 - w_h;
 ```
 
 $$
-y_h = 3*\left(\sin^2\left(\frac{x}{10}\right)*\frac{\sin\left(\frac{x}{15}+2\right)}{1.5}+\cos\left(\frac{x}{35}\right)*\sin(\frac{x}{20})\right)
+y_h = 3*\left(\sin^2\left(\frac{x}{10}\right)*\frac{\sin\left(\frac{x}{15}+2\right)}{1.5}+\cos\left(\frac{x}{35}\right)\*\sin(\frac{x}{20})\right)
 $$
 
 $$
-y_m = 4*\left(\sin^3\left(\frac{2x}{25} \right )*\cos\left(\frac{x}{15} \right ) + \frac{\sin^2\left(\frac{6x}{35} \right )*\sin\left(\frac{7x}{15} \right )}{2} \right )
+y_m = 4*\left(\sin^3\left(\frac{2x}{25} \right )*\cos\left(\frac{x}{15} \right ) + \frac{\sin^2\left(\frac{6x}{35} \right )\*\sin\left(\frac{7x}{15} \right )}{2} \right )
 $$
 
 $$
@@ -138,12 +143,12 @@ $$
 
 #### Tree Generation Function
 
-```
+```cpp
 int x = 64.0/tree_density*i + 12*sin((double)i/4)*pow(cos(2*(double)i/7), 2);
 ```
 
 $$
-t_x = \frac{64.0}{tree_\rho}*i + 12*\sin\left(\frac{t_i}{4} \right )*\cos^2\left(\frac{2t_i}{7} \right )
+t_x = \frac{64.0}{tree_\rho}*i + 12\*\sin\left(\frac{t_i}{4} \right )\*\cos^2\left(\frac{2t_i}{7} \right )
 $$
 
 ### Entities
