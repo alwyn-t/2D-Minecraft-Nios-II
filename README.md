@@ -170,7 +170,7 @@ We have 25 different colour states for different times of the day and night cycl
 ||Aryan Hussian|Alwyn Tong|
 |---|---|---|
 |**I/O**|---|---|
-|Rendering| |`WD` `MR`|
+|VGA Output/Rendering| |`WD` `MR`|
 |PS/2 Keyboard| |`WD` `MR`|
 |PS/2 Mouse|`ET`|`WD` `MR`|
 |Sound|`WD` `MR`| |
