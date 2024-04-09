@@ -164,3 +164,25 @@ Generic entity controller is used to do collision detection, acceleration and en
 ### Sky
 
 We have 25 different colour states for different times of the day and night cycle, to ensure a smooth display, we interpolate (we take the percentage between the two colours and combine each R, G, B value separately before recombining) between the current colour and the next colour to make dynamic sky colour.
+
+## Attribution Table
+
+||Aryan Hussian|Alwyn Tong|
+|---|---|---|
+|**I/O**|---|---|
+|Rendering| |`WD` `MR`|
+|PS/2 Keyboard| |`WD` `MR`|
+|PS/2 Mouse|`ET`|`WD` `MR`|
+|Sound|`WD` `MR`| |
+|**Gameplay**|---|---|
+|World Generation| |`WD` `MR`|
+|Block Textures|`WD`|`WD` `MR`|
+|Start Screen|`WD` `MR`| |
+|Player Movement|`ET`|`WD` `MR`|
+|Entity Collision|`WD`|`MR`|
+|Toolbar|`WD` `MR`| |
+|Health + Fall Damage|`WD` `MR`| |
+|Day and Night Cycle| |`WD` `MR`|
+|Items| |`WD` `MR`|
+
+`WD` - Working Draft, `MR` - Major Revision, `ET` - Edited
